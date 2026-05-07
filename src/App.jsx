@@ -1,658 +1,661 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { 
-  Search, Plus, Trash2, ChevronRight, Utensils, Flame, Activity, Scale, X,
-  PieChart, Clock, History, ChevronLeft, Calendar, Coffee, Sun, Moon, Cookie,
-  Sparkles, MessageSquare, Wand2, GripVertical, AlertCircle, Mic, Camera,
-  CalendarDays, ListChecks, CheckCircle2, Circle, Save, Repeat, BarChart3,
-  ScanLine, Cloud, CloudOff, Zap, Pencil
+  Search, Plus, Trash2, ChevronRight, ChevronLeft, ChevronDown, X,
+  Clock, CalendarDays, ListChecks, CheckCircle2, Circle, Save, Pencil,
+  Loader2, TrendingUp, Target, Settings, Sparkle, Sun, Moon, AlertCircle, 
+  Scale, Droplets, RefreshCw
 } from 'lucide-react';
 
-// Environment variables for local deployment
-const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'calorie-counter-v1';
-const USDA_API_KEY = 'lkRdpKqn24LgJ3oDTYpLyXyQH7elck6d4GTiOR9Q'; 
-// NOTE: When deploying, uncomment the line below and use your .env file!
-// const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+// --- Configuration ---
+const APP_ID = 'calorie-tracker-v1';
+
+// AZURE DEPLOYMENT: Replace these strings with your import.meta.env variables before deploying to GitHub
+const USDA_API_KEY = 'DEMO_KEY'; 
 const apiKey = ""; 
 
-// --- Firebase Init ---
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-const app = firebaseConfig ? initializeApp(firebaseConfig) : null;
-const auth = app ? getAuth(app) : null;
-const db = app ? getFirestore(app) : null;
+// --- Firebase Initialization ---
+let auth = null, db = null;
+try {
+  const cfg = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+  if (cfg) { const app = initializeApp(cfg); auth = getAuth(app); db = getFirestore(app); }
+} catch (e) { console.warn("Firebase Shield Active"); }
 
-// --- SafeInput Component ---
-// This completely isolates mobile keyboard typing from React re-renders, 
-// fixing the "backwards typing" / cursor jumping bug on Android/iOS.
-const SafeInput = ({ value, onChange, ...props }) => {
-  const [localVal, setLocalVal] = useState(value || '');
-  useEffect(() => { setLocalVal(value || ''); }, [value]);
-  const handleChange = (e) => {
-    setLocalVal(e.target.value);
-    onChange(e.target.value);
-  };
-  return <input value={localVal} onChange={handleChange} {...props} />;
+// --- Aesthetic Theme Engine ---
+const COLORS = {
+  emerald: { bg: 'bg-emerald-500', text: 'text-emerald-500', bgLight: 'bg-emerald-50', bgDark: 'dark:bg-emerald-900/30', ring: 'ring-emerald-500', border: 'border-emerald-200 dark:border-emerald-800/50', shadow: 'shadow-emerald-900/20' },
+  sky: { bg: 'bg-sky-500', text: 'text-sky-500', bgLight: 'bg-sky-50', bgDark: 'dark:bg-sky-900/30', ring: 'ring-sky-500', border: 'border-sky-200 dark:border-sky-800/50', shadow: 'shadow-sky-900/20' },
+  orange: { bg: 'bg-orange-500', text: 'text-orange-500', bgLight: 'bg-orange-50', bgDark: 'dark:bg-orange-900/30', ring: 'ring-orange-500', border: 'border-orange-200 dark:border-orange-800/50', shadow: 'shadow-orange-900/20' },
+  indigo: { bg: 'bg-indigo-500', text: 'text-indigo-500', bgLight: 'bg-indigo-50', bgDark: 'dark:bg-indigo-900/30', ring: 'ring-indigo-500', border: 'border-indigo-200 dark:border-indigo-800/50', shadow: 'shadow-indigo-900/20' },
+  rose: { bg: 'bg-rose-500', text: 'text-rose-500', bgLight: 'bg-rose-50', bgDark: 'dark:bg-rose-900/30', ring: 'ring-rose-500', border: 'border-rose-200 dark:border-rose-800/50', shadow: 'shadow-rose-900/20' },
+  amber: { bg: 'bg-amber-500', text: 'text-amber-500', bgLight: 'bg-amber-50', bgDark: 'dark:bg-amber-900/30', ring: 'ring-amber-500', border: 'border-amber-200 dark:border-amber-800/50', shadow: 'shadow-amber-900/20' },
+  blue: { bg: 'bg-blue-500', text: 'text-blue-500', bgLight: 'bg-blue-50', bgDark: 'dark:bg-blue-900/30', ring: 'ring-blue-500', border: 'border-blue-200 dark:border-blue-800/50', shadow: 'shadow-blue-900/20' }
 };
 
-const App = () => {
-  // Navigation & UI State
+const getThemeForDate = (dateStr) => {
+  const d = new Date(dateStr + 'T12:00:00Z');
+  const m = d.getMonth() + 1; 
+  const day = d.getDate();
+
+  if (m === 12 && day >= 20) return { img: 'https://images.unsplash.com/photo-1512389142860-9c281c678a85?auto=format&fit=crop&w=800&q=80', color: COLORS.rose }; // Christmas
+  if (m === 10 && day >= 24) return { img: 'https://images.unsplash.com/photo-1508344928928-7137b29de216?auto=format&fit=crop&w=800&q=80', color: COLORS.amber }; // Halloween
+  if (m === 2 && day >= 10 && day <= 14) return { img: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=800&q=80', color: COLORS.rose }; // Valentines
+  if (m === 7 && day >= 1 && day <= 4) return { img: 'https://images.unsplash.com/photo-1531366936336-1e64df2ec2e0?auto=format&fit=crop&w=800&q=80', color: COLORS.blue }; // Independence
+
+  if (m >= 3 && m <= 5) return { img: 'https://images.unsplash.com/photo-1490750967868-88aa4486c946?auto=format&fit=crop&w=800&q=80', color: COLORS.emerald }; // Spring
+  if (m >= 6 && m <= 8) return { img: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80', color: COLORS.sky }; // Summer
+  if (m >= 9 && m <= 11) return { img: 'https://images.unsplash.com/photo-1476820865390-c52aeebb9891?auto=format&fit=crop&w=800&q=80', color: COLORS.orange }; // Autumn
+  return { img: 'https://images.unsplash.com/photo-1483664852095-d6cc6870702d?auto=format&fit=crop&w=800&q=80', color: COLORS.indigo }; // Winter
+};
+
+// --- Ultimate Error Boundary ---
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false }; }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-center">
+          <AlertCircle size={48} className="text-rose-500 mb-4" />
+          <h1 className="text-xl font-bold text-white mb-2">Oops, something hitched!</h1>
+          <button onClick={() => window.location.reload()} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg">Reload App</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// --- SafeInput ---
+const SafeInput = ({ value, onChange, ...props }) => {
+  const [localVal, setLocalVal] = useState(value !== undefined && value !== null ? String(value) : '');
+  useEffect(() => { setLocalVal(value !== undefined && value !== null ? String(value) : ''); }, [value]);
+  return (
+    <input 
+      value={localVal} 
+      onChange={(e) => setLocalVal(e.target.value)}
+      onBlur={() => { if (localVal !== String(value)) onChange(localVal); }}
+      className={`focus:outline-none transition-all ${props.className}`}
+      {...props} 
+    />
+  );
+};
+
+const TrackerApp = () => {
+  // Navigation & UI
   const [activeTab, setActiveTab] = useState('log'); 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [pickerMonth, setPickerMonth] = useState(new Date());
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
+  const [viewingHistoryDetail, setViewingHistoryDetail] = useState(null);
+  
+  // Theme Management
+  const currentTheme = useMemo(() => getThemeForDate(selectedDate), [selectedDate]);
+  const th = currentTheme.color; 
+  
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  useEffect(() => {
+    try { const saved = localStorage.getItem(`${APP_ID}_theme`); if (saved) setIsDarkMode(saved === 'true'); } catch(e) {}
+  }, []);
+  const toggleTheme = () => {
+    const newTheme = !isDarkMode;
+    setIsDarkMode(newTheme);
+    document.documentElement.classList.toggle('dark', newTheme);
+    try { localStorage.setItem(`${APP_ID}_theme`, newTheme); } catch(e) {}
+  };
+
+  // Search & USDA
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchMode, setSearchMode] = useState('ai'); 
+  const [searchMode, setSearchMode] = useState('db'); 
+  const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [selectedFoodForEdit, setSelectedFoodForEdit] = useState(null);
-  const [quantity, setQuantity] = useState(1);
   const [mealType, setMealType] = useState('Breakfast');
-  
-  // Theme & Quick Add
-  const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem(`${APP_ID}_theme`) === 'true');
-  const [showQuickAdd, setShowQuickAdd] = useState(false);
-  const [quickAddData, setQuickAddData] = useState({ name: '', calories: '', protein: '', carbs: '', fat: '', portion: '1 serving' });
+  const [customCalories, setCustomCalories] = useState('');
 
-  // Camera Menu State
-  const [showCameraMenu, setShowCameraMenu] = useState(false);
-  const [cameraTarget, setCameraTarget] = useState('meal'); 
-  const fileInputRef = useRef(null);
-  
-  // Routine Builder State
-  const [builderItems, setBuilderItems] = useState([]);
-  const [builderName, setBuilderName] = useState('');
-  const [builderAutoDays, setBuilderAutoDays] = useState([]);
+  // Routine Builder
+  const [isBuilding, setIsBuilding] = useState(false);
   const [editingRoutineId, setEditingRoutineId] = useState(null);
+  const [builderName, setBuilderName] = useState('');
+  const [builderDays, setBuilderDays] = useState(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+  const [builderItems, setBuilderItems] = useState([]);
 
-  // Drag and Drop State
-  const [draggingItemId, setDraggingItemId] = useState(null);
-  const [dropTargetMeal, setDropTargetMeal] = useState(null);
-  const [touchDrag, setTouchDrag] = useState(null);
-  const ghostRef = useRef(null);
-  const longPressTimeout = useRef(null);
-  const initialTouch = useRef(null);
-
-  // AI State
-  const [isAiLoading, setIsAiLoading] = useState(false);
-  const [aiCoachResponse, setAiCoachResponse] = useState(null);
-  const [showAiModal, setShowAiModal] = useState(false);
-  const [aiError, setAiError] = useState(null);
-  const [isListening, setIsListening] = useState(false);
-  const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
-  const [selectedDiets, setSelectedDiets] = useState([]);
-  const [newDietInput, setNewDietInput] = useState('');
-
-  const defaultDiets = ['Keto', 'Vegan', 'Vegetarian', 'PCOS-Friendly', 'Macular Support', 'Gluten-Free'];
-
-  // Cloud Data State
+  // Data State
+  const defaultProfile = { 
+    dailyGoal: 2000, proteinGoal: 150, carbsGoal: 250, fatGoal: 65,
+    currentWeight: 150, targetWeight: 140, waterGoal: 80, units: 'lbs'
+  };
   const [user, setUser] = useState(null);
   const [dailyLog, setDailyLog] = useState([]);
   const [routines, setRoutines] = useState([]);
-  const [appliedRoutines, setAppliedRoutines] = useState({});
-  const [userProfile, setUserProfile] = useState({ dailyGoal: 2000, proteinGoal: 150, carbsGoal: 250, fatGoal: 65, customDiets: defaultDiets });
+  const [userProfile, setUserProfile] = useState(defaultProfile);
 
-  useEffect(() => { 
-    document.documentElement.classList.toggle('dark', isDarkMode);
-    localStorage.setItem(`${APP_ID}_theme`, isDarkMode); 
-  }, [isDarkMode]);
+  // --- USDA API Search ---
+  const searchUSDA = async (query) => {
+    if (!query || query.length < 3) { setSearchResults([]); return; }
+    setIsSearching(true);
+    try {
+      const response = await fetch(`https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${USDA_API_KEY}&query=${encodeURIComponent(query)}&pageSize=8`);
+      const data = await response.json();
+      const results = (data.foods || []).map(f => {
+        const getNut = (id) => f.foodNutrients?.find(n => n.nutrientId === id || n.nutrientNumber === id.toString())?.value || 0;
+        return {
+          id: f.fdcId.toString() + Math.floor(Math.random() * 1000),
+          name: f.description,
+          brand: f.brandOwner,
+          calories: Math.round(getNut(208) || getNut(1008)),
+          protein: Math.round(getNut(203)),
+          carbs: Math.round(getNut(205)),
+          fat: Math.round(getNut(204)),
+          portion: f.servingSize ? `${f.servingSize}${f.servingSizeUnit}` : '1 serving'
+        };
+      });
+      setSearchResults(results);
+    } catch (e) { console.error(e); } finally { setIsSearching(false); }
+  };
 
-  // Auth
+  useEffect(() => {
+    const timer = setTimeout(() => { if (searchMode === 'db' && searchQuery.length > 2) searchUSDA(searchQuery); }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery, searchMode]);
+
+  // --- Sync Logic & Optimistic Updates ---
   useEffect(() => {
     if (!auth) return;
-    const initAuth = async () => {
-      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { await signInWithCustomToken(auth, __initial_auth_token); } 
-      else { await signInAnonymously(auth); }
-    };
-    initAuth();
-    const unsubscribe = onAuthStateChanged(auth, setUser);
-    return () => unsubscribe();
+    return onAuthStateChanged(auth, u => { if (u) setUser(u); else signInAnonymously(auth).catch(() => {}); });
   }, []);
 
-  // Data Sync
   useEffect(() => {
     if (!user || !db) return;
+    const path = (c) => collection(db, 'artifacts', APP_ID, 'users', user.uid, c);
     const unsubs = [
-      onSnapshot(collection(db, 'artifacts', APP_ID, 'users', user.uid, 'dailyLog'), (snap) => setDailyLog(snap.docs.map(d => d.data())), console.error),
-      onSnapshot(collection(db, 'artifacts', APP_ID, 'users', user.uid, 'routines'), (snap) => setRoutines(snap.docs.map(d => d.data())), console.error),
-      onSnapshot(collection(db, 'artifacts', APP_ID, 'users', user.uid, 'profile'), (snap) => { 
-        snap.docs.forEach(d => { 
-          if (d.id === 'main') {
-            const data = d.data();
-            setUserProfile({ ...data, customDiets: data.customDiets || defaultDiets });
-          }
-        }); 
-      }, console.error)
+      onSnapshot(path('dailyLog'), s => setDailyLog(s.docs.map(d => ({...d.data(), id: d.id})))),
+      onSnapshot(path('routines'), s => setRoutines(s.docs.map(d => ({...d.data(), id: d.id})))),
+      onSnapshot(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'profile', 'main'), ds => { if (ds.exists()) setUserProfile({...defaultProfile, ...ds.data()}); })
     ];
-    return () => unsubs.forEach(u => u());
+    return () => unsubs.forEach(u => typeof u === 'function' && u());
   }, [user]);
 
   const updateDB = async (c, id, data, isDel = false) => {
+    if (c === 'dailyLog') setDailyLog(prev => isDel ? prev.filter(i => i.id !== id) : [...prev.filter(i => i.id !== id), data]);
+    else if (c === 'routines') setRoutines(prev => isDel ? prev.filter(i => i.id !== id) : [...prev.filter(i => i.id !== id), data]);
+    else if (c === 'profile') setUserProfile(data);
+
     if (!db || !user) return;
     const ref = doc(db, 'artifacts', APP_ID, 'users', user.uid, c, id.toString());
-    if (isDel) await deleteDoc(ref); else await setDoc(ref, data);
+    try { if (isDel) await deleteDoc(ref); else await setDoc(ref, data); } 
+    catch(e) { console.warn("Remote sync delayed", e); }
   };
 
-  const handleUpdateProfile = (np) => { setUserProfile(np); updateDB('profile', 'main', np); };
-
-  const addCustomDiet = () => {
-    if (!newDietInput.trim()) return;
-    const currentDiets = userProfile.customDiets || defaultDiets;
-    if (currentDiets.includes(newDietInput.trim())) return setNewDietInput('');
-    handleUpdateProfile({ ...userProfile, customDiets: [...currentDiets, newDietInput.trim()] });
-    setNewDietInput('');
+  const handleProfileUpdate = (key, val, isString = false) => {
+    const parsedVal = isString ? val : (val === '' ? '' : Number(val));
+    updateDB('profile', 'main', { ...userProfile, [key]: parsedVal });
   };
 
-  const removeCustomDiet = (dietToRemove, e) => {
-    e.stopPropagation();
-    const currentDiets = userProfile.customDiets || defaultDiets;
-    handleUpdateProfile({ ...userProfile, customDiets: currentDiets.filter(d => d !== dietToRemove) });
-    setSelectedDiets(prev => prev.filter(d => d !== dietToRemove));
-  };
-
-  // Theme Logic
-  const currentTheme = useMemo(() => {
-    const d = new Date(selectedDate + 'T12:00:00Z');
-    const m = d.getMonth() + 1;
-    if (m === 12) return { bg: 'bg-gradient-to-br from-red-600 to-green-700', deco: '🎄' };
-    return { bg: 'bg-gradient-to-br from-amber-400 to-orange-500', deco: '🐝' };
-  }, [selectedDate]);
-
-  const filteredLogs = useMemo(() => dailyLog.filter(item => item.date === selectedDate), [dailyLog, selectedDate]);
-  const totals = useMemo(() => filteredLogs.reduce((acc, i) => {
-    if (i.isEaten !== false) { acc.calories += (i.calories || 0); acc.protein += (i.protein || 0); acc.carbs += (i.carbs || 0); acc.fat += (i.fat || 0); }
-    return acc;
-  }, { calories: 0, protein: 0, carbs: 0, fat: 0 }), [filteredLogs]);
-
-  const weeklyTrends = useMemo(() => {
-    const days = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(selectedDate + 'T12:00:00Z'); d.setDate(d.getDate() - i);
-      const dStr = d.toISOString().split('T')[0];
-      const dCals = dailyLog.filter(l => l.date === dStr && l.isEaten !== false).reduce((s, j) => s + j.calories, 0);
-      days.push({ label: d.toLocaleDateString('en-US', { weekday: 'short' }), calories: dCals });
-    }
-    return { days, avgCals: Math.round(days.reduce((s,d)=>s+d.calories,0)/7) };
+  // --- Calculations ---
+  const safeDailyGoal = Math.max(Number(userProfile?.dailyGoal) || 2000, 1);
+  const totals = useMemo(() => {
+    return (dailyLog || []).filter(i => i.date === selectedDate && i.isEaten !== false).reduce((acc, i) => {
+      acc.calories += (Number(i.calories) || 0); acc.protein += (Number(i.protein) || 0); acc.carbs += (Number(i.carbs) || 0); acc.fat += (Number(i.fat) || 0);
+      return acc;
+    }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
   }, [dailyLog, selectedDate]);
 
-  // Form Resets
-  const resetRoutineForm = () => { setBuilderName(''); setBuilderItems([]); setBuilderAutoDays([]); setEditingRoutineId(null); };
-  const resetSearchForm = () => { setSearchQuery(''); setSearchResults([]); };
-  const resetQuickAddForm = () => { setQuickAddData({ name: '', calories: '', protein: '', carbs: '', fat: '', portion: '1 serving' }); };
+  const todayRoutines = useMemo(() => {
+    const dayName = new Date(selectedDate + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short' });
+    return (routines || []).filter(r => r?.days?.includes(dayName));
+  }, [routines, selectedDate]);
 
-  // Drag & Drop
-  useEffect(() => {
-    if (!draggingItemId) return;
-    const handleTouchMove = (e) => {
-      if (e.cancelable) e.preventDefault(); 
-      const touch = e.touches[0];
-      if (ghostRef.current) ghostRef.current.style.transform = `translate3d(${touch.clientX - 30}px, ${touch.clientY - 30}px, 0)`;
-      const el = document.elementFromPoint(touch.clientX, touch.clientY);
-      const meal = el?.closest('[data-meal-type]')?.getAttribute('data-meal-type');
-      setDropTargetMeal(meal || null);
-    };
-    const handleTouchEnd = () => {
-      if (draggingItemId && dropTargetMeal) {
-        const item = dailyLog.find(i => i.id === draggingItemId);
-        if (item) updateDB('dailyLog', item.id, { ...item, mealType: dropTargetMeal });
-      }
-      setDraggingItemId(null); setDropTargetMeal(null); setTouchDrag(null);
-    };
-    window.addEventListener('touchmove', handleTouchMove, { passive: false });
-    window.addEventListener('touchend', handleTouchEnd);
-    document.body.style.overflow = 'hidden';
-    return () => { window.removeEventListener('touchmove', handleTouchMove); window.removeEventListener('touchend', handleTouchEnd); document.body.style.overflow = ''; };
-  }, [draggingItemId, dropTargetMeal, dailyLog]);
-
-  const handleItemTouchStart = (e, item) => {
-    if (e.target.closest('button')) return;
-    const t = e.touches[0];
-    initialTouch.current = { x: t.clientX, y: t.clientY };
-    longPressTimeout.current = setTimeout(() => {
-      setDraggingItemId(item.id); setTouchDrag({ item, initialX: t.clientX, initialY: t.clientY });
-      if (navigator.vibrate) navigator.vibrate(50);
-    }, 350);
-  };
-
-  // Date Change
-  const changeDate = (offset) => {
-    const d = new Date(selectedDate + 'T12:00:00Z'); d.setDate(d.getDate() + offset);
-    setSelectedDate(d.toISOString().split('T')[0]);
-  };
-
-  // API Call Wrapper
-  const callGemini = async (prompt, systemInstruction, imageData = null, mimeType = null) => {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-    const fetchWithRetry = async (retries = 0) => {
-      try {
-        const parts = [{ text: prompt }];
-        if (imageData) parts.push({ inlineData: { mimeType, data: imageData } });
-        const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ role: "user", parts }], systemInstruction: { parts: [{ text: systemInstruction }] }, generationConfig: { responseMimeType: "application/json" } }) });
-        if (!response.ok) throw new Error(`API Error: ${response.status}`);
-        return await response.json();
-      } catch (err) {
-        if (retries < 5) { await new Promise(resolve => setTimeout(resolve, Math.pow(2, retries) * 1000)); return fetchWithRetry(retries + 1); }
-        throw err;
-      }
-    };
-    return fetchWithRetry();
-  };
-
-  // Actions
-  const handleUnifiedSearch = async (e) => {
-    if (e) e.preventDefault();
-    if (!searchQuery.trim()) return;
-    if (searchMode === 'ai') {
-      setIsAiLoading(true);
-      try {
-        const res = await callGemini(`Estimate nutrition: "${searchQuery}"`, `Format: { "name": string, "calories": number, "protein": number, "carbs": number, "fat": number }`);
-        const parsed = JSON.parse(res.candidates[0].content.parts[0].text.replace(/```json\n?|```/g, ''));
-        const newItem = { id: Date.now(), date: selectedDate, mealType: mealType, name: parsed.name, brand: 'AI ✨', calories: parsed.calories, protein: parsed.protein, carbs: parsed.carbs, fat: parsed.fat, isEaten: true, portion: '1 serving' };
-        if (activeTab === 'routineBuilder') setBuilderItems([...builderItems, newItem]);
-        else { updateDB('dailyLog', newItem.id, newItem); setActiveTab('log'); }
-        resetSearchForm();
-      } catch (e) { setAiError("AI Error"); } finally { setIsAiLoading(false); }
+  // --- Actions ---
+  const handleAddItem = (foodItem) => {
+    if (isBuilding) {
+      setBuilderItems([...(builderItems || []), { ...foodItem, id: Date.now().toString() + Math.floor(Math.random()*1000), mealType }]);
     } else {
-      setIsLoading(true);
-      const res = await fetch(`https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${USDA_API_KEY}&query=${encodeURIComponent(searchQuery)}&pageSize=15`);
-      const data = await res.json();
-      setSearchResults(data.foods || []); setIsLoading(false);
+      const uniqueId = Date.now().toString() + Math.floor(Math.random()*1000);
+      updateDB('dailyLog', uniqueId, { ...foodItem, id: uniqueId, date: selectedDate, mealType, isEaten: true });
     }
+    setSearchResults([]);
+    setSearchQuery('');
+    setCustomCalories('');
   };
 
-  const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setIsAiLoading(true); setAiError(null); setShowCameraMenu(false);
-    try {
-      const base64 = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result.split(',')[1]); reader.onerror = error => reject(error); });
-      const isLabel = cameraTarget === 'label';
-      const systemPrompt = isLabel ? `You are an OCR and Nutrition bot. Read this nutrition label exactly as printed. Extract the exact numbers for 1 serving. DO NOT GUESS. Format: { "name": "Scanned Food", "calories": number, "protein": number, "carbs": number, "fat": number, "portion": "string" }` : `You are a nutrition expert. Analyze the food in the image and return a JSON object with nutrition facts. Format: { "name": string, "calories": number, "protein": number, "carbs": number, "fat": number, "portion": "string" }`;
-      
-      const data = await callGemini(isLabel ? `Extract exact nutrition facts from this label.` : `Estimate nutrition for this food.`, systemPrompt, base64, file.type);
-      const parsed = JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text.replace(/```json\n?|```/g, '').trim());
-      const newItem = {
-        id: Date.now(), date: selectedDate, mealType: mealType, name: parsed.name, brand: isLabel ? '🏷️ Scanned Label' : '📸 AI Camera ✨',
-        calories: Math.round(parsed.calories || 0), protein: Math.round(parsed.protein || 0), carbs: Math.round(parsed.carbs || 0), fat: Math.round(parsed.fat || 0),
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), portion: parsed.portion || '1 serving', isEaten: true
-      };
-      updateDB('dailyLog', newItem.id, newItem);
-      if (!db) setDailyLog([newItem, ...dailyLog]);
-      setActiveTab('log');
-    } catch (err) { setAiError("Could not analyze image. Try a clearer photo!"); } 
-    finally { setIsAiLoading(false); e.target.value = ''; }
+  const handleApplyRoutine = (routine) => {
+    (routine?.items || []).forEach(item => {
+      const uniqueId = Date.now().toString() + Math.floor(Math.random() * 1000);
+      updateDB('dailyLog', uniqueId, { ...item, id: uniqueId, date: selectedDate, isEaten: true, routineId: routine.id });
+    });
   };
 
-  const generateMealPlan = async () => {
-    setIsGeneratingPlan(true); setAiError(null);
-    try {
-      const dietContext = selectedDiets.length > 0 ? `The meals MUST strictly adhere to the following dietary restrictions/regiments: ${selectedDiets.join(', ')}. ` : '';
-      const data = await callGemini(`Create a 1-day meal plan hitting exactly ${userProfile.dailyGoal} calories, ${userProfile.proteinGoal}g protein, ${userProfile.carbsGoal}g carbs, ${userProfile.fatGoal}g fat. ${dietContext}Return a JSON array of exactly 4 meals. Format: [{"mealType": "Breakfast", "name": "string", "calories": number, "protein": number, "carbs": number, "fat": number, "portion": "string"}, ...]`, "Return ONLY a JSON array.");
-      const parsedMeals = JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text.replace(/```json\n?|```/g, '').trim());
-      parsedMeals.forEach(meal => {
-        const newItem = { id: Date.now() + Math.random(), date: selectedDate, mealType: meal.mealType, name: meal.name, brand: 'AI Planned ✨', calories: Math.round(meal.calories), protein: Math.round(meal.protein), carbs: Math.round(meal.carbs), fat: Math.round(meal.fat), time: 'Planned', portion: meal.portion, isEaten: false };
-        updateDB('dailyLog', newItem.id, newItem);
-        if (!db) setDailyLog(prev => [newItem, ...prev]);
-      });
-      setActiveTab('log');
-    } catch (err) { setAiError("Failed to generate meal plan."); } 
-    finally { setIsGeneratingPlan(false); }
-  };
-
-  const getAiInsights = async () => {
-    setIsAiLoading(true); setShowAiModal(true); setAiCoachResponse(null);
-    const logSummary = filteredLogs.filter(i => i.isEaten !== false).map(i => `${i.name} (${i.calories} kcal)`).join(', ');
-    try {
-      const data = await callGemini(`Progress: ${totals.calories}/${userProfile.dailyGoal} kcal. Log: ${logSummary || 'Nothing logged.'}. Return JSON: { "advice": [string, string, string], "rating": string }`, "Friendly health coach.");
-      setAiCoachResponse(JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text));
-    } catch (err) { setAiError("Failed to get AI insights."); } 
-    finally { setIsAiLoading(false); }
-  };
-
-  const handleQuickAddAction = () => {
-    if (!quickAddData.name || !quickAddData.calories) return;
-    const newItem = {
-      id: Date.now(), date: selectedDate, mealType: mealType,
-      name: quickAddData.name, brand: '⚡ Quick Add',
-      calories: parseInt(quickAddData.calories) || 0, protein: parseInt(quickAddData.protein) || 0, carbs: parseInt(quickAddData.carbs) || 0, fat: parseInt(quickAddData.fat) || 0,
-      portion: quickAddData.portion || '1 serving', isEaten: true
-    };
-    updateDB('dailyLog', newItem.id, newItem);
-    setShowQuickAdd(false); resetQuickAddForm(); setActiveTab('log');
-  };
-
-  const handleAddItemAction = () => {
-    if (!selectedFoodForEdit) return;
-    const getNutrient = (food, id) => { const n = food.foodNutrients?.find(x => x.nutrientId === id || x.nutrientNumber === id.toString()); return n ? n.value : 0; };
-    const newItem = {
-      id: Date.now(), date: selectedDate, mealType: mealType,
-      name: selectedFoodForEdit.description, brand: selectedFoodForEdit.brandOwner || 'Generic',
-      calories: Math.round(getNutrient(selectedFoodForEdit, 1008) * quantity), protein: Math.round(getNutrient(selectedFoodForEdit, 1003) * quantity), carbs: Math.round(getNutrient(selectedFoodForEdit, 1005) * quantity), fat: Math.round(getNutrient(selectedFoodForEdit, 1004) * quantity),
-      portion: selectedFoodForEdit.servingSize ? `${(selectedFoodForEdit.servingSize * quantity).toFixed(1)} ${selectedFoodForEdit.servingSizeUnit}` : `${quantity} serving(s)`
-    };
-    if (activeTab === 'routineBuilder') setBuilderItems([...builderItems, newItem]);
-    else { updateDB('dailyLog', newItem.id, { ...newItem, isEaten: true }); setActiveTab('log'); }
-    setSelectedFoodForEdit(null); resetSearchForm();
+  const handleRemoveRoutine = (routineId) => {
+    const itemsToRemove = (dailyLog || []).filter(log => log.date === selectedDate && log.routineId === routineId);
+    itemsToRemove.forEach(item => updateDB('dailyLog', item.id, null, true));
   };
 
   const saveRoutine = () => {
-    if (!builderName.trim() || builderItems.length === 0) return;
-    const newRoutine = { id: editingRoutineId || Date.now(), name: builderName, items: builderItems, autoDays: builderAutoDays };
-    updateDB('routines', newRoutine.id, newRoutine);
-    resetRoutineForm(); setActiveTab('routines');
+    if (!builderName) return;
+    const id = editingRoutineId || Date.now().toString();
+    updateDB('routines', id, { id, name: builderName, items: builderItems, days: builderDays });
+    setIsBuilding(false);
+    setBuilderName('');
+    setBuilderItems([]);
+    setEditingRoutineId(null);
   };
 
-  const applyRoutine = (routine) => {
-    routine.items.forEach(item => {
-      const newItem = { ...item, id: Date.now() + Math.random(), date: selectedDate, isEaten: false, time: 'Routine' };
-      updateDB('dailyLog', newItem.id, newItem);
-    });
-    setAppliedRoutines(prev => ({ ...prev, [selectedDate]: [...(prev[selectedDate] || []), routine.id] }));
-    setActiveTab('log');
-  };
+  // --- Unified Search UI Render Function ---
+  const renderSearchEngineUI = () => (
+    <div className="space-y-3">
+      <div className={`relative flex items-center rounded-[24px] border-2 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm ${th.border} focus-within:${th.ring} transition-all shadow-sm`}>
+        <button onClick={() => { setSearchMode(searchMode === 'ai' ? 'db' : 'ai'); setSearchResults([]); }} className={`pl-5 pr-2 py-4 text-[10px] font-black ${th.text} uppercase tracking-widest`}>
+          {searchMode === 'ai' ? '✨ AI' : '🔍 DB'}
+        </button>
+        <input placeholder={searchMode === 'db' ? "Search USDA Database..." : "Custom food name..."} className="flex-1 bg-transparent py-4 px-2 text-sm font-medium dark:text-white focus:outline-none" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+        {isSearching && <Loader2 className={`animate-spin ${th.text} mr-5`} size={20} />}
+      </div>
 
-  const startListening = () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return setAiError("Voice search not supported.");
-    const recognition = new SpeechRecognition();
-    recognition.onstart = () => setIsListening(true);
-    recognition.onresult = (event) => setSearchQuery(event.results[0][0].transcript);
-    recognition.onend = () => setIsListening(false);
-    recognition.start();
-  };
+      {(searchResults.length > 0 || (searchQuery.length > 2 && searchMode === 'ai')) && (
+        <div className={`bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-[32px] border ${th.border} p-2 shadow-2xl space-y-1 animate-in slide-in-from-top-4 relative z-20`}>
+          <div className="flex gap-1 p-1 mb-2">
+             {['Breakfast','Lunch','Dinner','Snacks'].map(m => <button key={m} onClick={() => setMealType(m)} className={`flex-1 py-2 text-[9px] font-black uppercase rounded-xl transition-all ${mealType === m ? `${th.bg} text-white shadow-md` : `text-slate-500 bg-slate-100 dark:bg-slate-800 hover:${th.bgLight}`}`}>{m}</button>)}
+          </div>
+          
+          {searchResults.map(f => (
+            <button key={f.id} onClick={() => handleAddItem(f)} className={`w-full text-left p-4 hover:${th.bgLight} rounded-2xl flex justify-between items-center transition-colors`}>
+              <div className="flex-1 mr-4 overflow-hidden"><p className="text-xs font-bold dark:text-white truncate">{f.name}</p><p className="text-[10px] text-slate-400 font-bold uppercase truncate">{f.brand || 'USDA'}</p></div>
+              <div className={`text-right ${th.text} font-black text-xs whitespace-nowrap ${th.bgLight} px-3 py-1.5 rounded-xl`}>{f.calories} kcal</div>
+            </button>
+          ))}
 
-  const renderProgressBar = (current, goal, label, color) => (
-    <div key={label} className="mb-4">
-      <div className="flex justify-between text-xs font-semibold mb-1 uppercase tracking-wider text-slate-500 dark:text-slate-400"><span>{label}</span><span>{current} / {goal}g</span></div>
-      <div className="w-full bg-slate-100 dark:bg-slate-800/80 rounded-full h-2.5 overflow-hidden shadow-inner"><div className={`h-full transition-all duration-500 ease-out ${color}`} style={{ width: `${Math.min((current / goal) * 100, 100)}%` }} /></div>
+          <div className={`p-3 ${th.bgLight} rounded-2xl mt-2 border ${th.border}`}>
+             <p className={`text-[10px] font-black ${th.text} uppercase tracking-widest mb-2 px-1 opacity-70`}>Or Add Custom Entry</p>
+             <div className="flex gap-2">
+               <input type="number" placeholder="Calories" value={customCalories} onChange={e => setCustomCalories(e.target.value)} className="w-24 bg-white dark:bg-slate-800 p-3 rounded-xl text-xs font-bold dark:text-white text-center focus:outline-none shadow-sm" />
+               <button onClick={() => { if(searchQuery && customCalories) handleAddItem({ name: searchQuery, calories: Number(customCalories), protein: 0, carbs: 0, fat: 0, portion: '1 custom serving' }); }} className={`flex-1 ${th.bg} text-white font-black text-xs uppercase rounded-xl shadow-md active:scale-95 transition-transform`}>Add Custom</button>
+             </div>
+          </div>
+          <button onClick={() => { setSearchResults([]); setSearchQuery(''); setCustomCalories(''); }} className="w-full py-3 text-[10px] font-black text-slate-300 uppercase tracking-widest mt-2 hover:text-rose-400 transition-colors">Close Search</button>
+        </div>
+      )}
     </div>
   );
 
-  const renderMealSection = (title, Icon, type, theme = 'indigo') => {
-    const items = filteredLogs.filter(i => i.mealType === type);
-    const mealCals = items.reduce((s, i) => s + (i.isEaten !== false ? i.calories : 0), 0);
-    const styles = { amber: 'text-amber-500 bg-amber-50/50', sky: 'text-sky-500 bg-sky-50/50', indigo: 'text-indigo-500 bg-indigo-50/50', rose: 'text-rose-500 bg-rose-50/50' };
-    return (
-      <div key={type} data-meal-type={type} className={`mb-6 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 transition-all ${dropTargetMeal === type ? 'bg-indigo-50 dark:bg-indigo-900/20 scale-105 border-dashed' : ''}`}>
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-2"><div className={`p-2 rounded-xl ${styles[theme]} dark:bg-slate-800`}><Icon size={18} /></div><h3 className="font-bold dark:text-white">{title}</h3></div>
-          <span className="text-xs font-black text-slate-400">{mealCals} kcal</span>
-        </div>
-        <div className="space-y-2">
-          {items.map(item => (
-            <div key={item.id} onTouchStart={(e) => handleItemTouchStart(e, item)} className={`bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 flex justify-between items-center shadow-sm ${draggingItemId === item.id ? 'opacity-0' : ''}`}>
-              <div className="flex items-center gap-3">
-                <button onClick={() => updateDB('dailyLog', item.id, { ...item, isEaten: !item.isEaten })}>{item.isEaten === false ? <Circle className="text-slate-300" /> : <CheckCircle2 className="text-emerald-500" />}</button>
-                <div className={item.isEaten === false ? 'opacity-40' : ''}>
-                  <p className="text-sm font-bold dark:text-white leading-tight">{item.name}</p>
-                  <p className="text-[10px] text-slate-400">{item.portion}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-bold text-indigo-600">{item.calories}</span>
-                <button onClick={() => updateDB('dailyLog', item.id, null, true)} className="text-slate-300 hover:text-red-500"><Trash2 size={16} /></button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans transition-colors duration-300 flex flex-col items-center p-4 overflow-hidden">
-      <div className="max-w-md w-full bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-800 flex flex-col h-[90vh] relative transition-colors duration-300">
-        
-        {/* Day Header */}
-        <div className={`${currentTheme.bg} p-6 text-white shrink-0 relative overflow-hidden`}>
-          <div className="absolute -top-6 -right-6 text-[120px] opacity-20 pointer-events-none">{currentTheme.deco}</div>
-          <div className="relative z-10 flex justify-between items-center mb-6">
-            <button onClick={() => changeDate(-1)} className="p-1 hover:bg-white/10 rounded-lg"><ChevronLeft /></button>
-            <h1 className="font-bold text-lg">{new Date(selectedDate + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' })}</h1>
-            <button onClick={() => changeDate(1)} className="p-1 hover:bg-white/10 rounded-lg"><ChevronRight /></button>
-          </div>
-          <div className="relative z-10 flex items-center gap-6">
-            <div className="text-center bg-white/20 p-4 rounded-3xl backdrop-blur-md">
-              <div className="text-3xl font-black">{Math.max(userProfile.dailyGoal - totals.calories, 0)}</div>
-              <div className="text-[10px] uppercase font-bold opacity-80">Remaining</div>
-            </div>
-            <div className="flex-1">
-              <div className="text-sm font-bold">Goal: {userProfile.dailyGoal} kcal</div>
-              <button onClick={getAiInsights} className="bg-white/20 px-3 py-1 rounded-full text-[10px] mt-2 flex items-center gap-1 hover:bg-white/30"><Sparkles size={10} /> AI Coach</button>
-            </div>
-          </div>
-        </div>
+    <div className="min-h-screen font-sans flex flex-col items-center bg-slate-900 transition-colors duration-1000">
+      
+      {/* --- AESTHETIC APP CONTAINER --- */}
+      <div 
+        className="w-full max-w-md h-screen flex flex-col relative overflow-hidden bg-cover bg-center transition-all duration-1000"
+        style={{ backgroundImage: `url(${currentTheme.img})` }}
+      >
+        <div className={`absolute inset-0 transition-colors duration-1000 ${isDarkMode ? 'bg-black/60' : 'bg-black/20'}`}></div>
 
-        {/* Global Search */}
-        <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl sticky top-0 z-20">
-          <form onSubmit={handleUnifiedSearch} className="flex items-center gap-2">
-            <div className={`relative flex-1 flex items-center rounded-2xl border transition-all overflow-hidden ${searchMode === 'ai' ? 'border-indigo-200 bg-indigo-50/30' : 'border-slate-200 bg-slate-50'} dark:bg-slate-800 dark:border-slate-700`}>
-              <select value={searchMode} onChange={e => setSearchMode(e.target.value)} className="bg-transparent pl-3 pr-2 py-3 text-xs font-bold appearance-none dark:text-white cursor-pointer focus:outline-none">
-                <option value="ai">✨ AI</option>
-                <option value="db">🔍 DB</option>
-              </select>
-              <SafeInput autoComplete="off" spellCheck="false" placeholder="What did you eat?" className="flex-1 bg-transparent py-3 px-2 text-sm dark:text-white focus:outline-none w-full" value={searchQuery} onChange={setSearchQuery} />
-              {searchMode === 'ai' && <button type="button" onClick={startListening} className={`p-2 ${isListening ? 'text-red-500 animate-pulse' : 'text-indigo-400'}`}><Mic size={18} /></button>}
+        {/* --- GLOBAL HEADER --- */}
+        {!isBuilding && (
+          <div className="p-6 pb-12 text-white shrink-0 relative z-10">
+            <div className="flex justify-between items-center mb-8">
+              <button onClick={() => { const d = new Date(selectedDate+'T12:00:00Z'); d.setDate(d.getDate()-1); setSelectedDate(d.toISOString().split('T')[0]); }} className="p-2 hover:bg-white/20 rounded-full backdrop-blur-sm transition-all"><ChevronLeft /></button>
+              <button onClick={() => { setIsDatePickerOpen(true); setPickerMonth(new Date(selectedDate + 'T12:00:00Z')); }} className="flex items-center gap-2 group px-4 py-2 hover:bg-white/10 rounded-2xl backdrop-blur-sm transition-all">
+                <h1 className="font-black text-xl tracking-tight drop-shadow-md">{new Date(selectedDate + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' })}</h1>
+                <ChevronDown size={18} className="opacity-70 group-hover:opacity-100 transition-opacity" />
+              </button>
+              <button onClick={() => { const d = new Date(selectedDate+'T12:00:00Z'); d.setDate(d.getDate()+1); setSelectedDate(d.toISOString().split('T')[0]); }} className="p-2 hover:bg-white/20 rounded-full backdrop-blur-sm transition-all"><ChevronRight /></button>
             </div>
-            <button type="submit" className="p-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-2xl shadow-lg active:scale-95 transition-transform"><Plus size={20} /></button>
-          </form>
-          
-          <div className="flex gap-2 mt-3">
-             <button onClick={() => setShowQuickAdd(true)} className="flex-1 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-bold flex items-center justify-center gap-2"><Zap size={14}/> Quick Add</button>
-             <button onClick={() => { setShowCameraMenu(!showCameraMenu); setCameraTarget('meal'); }} className="flex-1 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-bold flex items-center justify-center gap-2"><Camera size={14}/> Scan Meal</button>
-             <button onClick={() => { setShowCameraMenu(!showCameraMenu); setCameraTarget('label'); }} className="flex-1 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-bold flex items-center justify-center gap-2"><ScanLine size={14}/> Scan Label</button>
-             {showCameraMenu && <input type="file" accept="image/*" capture="environment" className="hidden" ref={fileInputRef} onChange={handleImageUpload} />}
+            
+            <div className="flex items-center gap-6">
+              <div className="bg-white/15 p-6 rounded-[32px] backdrop-blur-xl border border-white/30 text-center min-w-[120px] shadow-2xl">
+                <div className="text-4xl font-black drop-shadow-md">{Math.max(safeDailyGoal - totals.calories, 0)}</div>
+                <div className="text-[10px] uppercase font-bold tracking-[0.2em] opacity-80 mt-1">Remaining</div>
+              </div>
+              <div className="flex-1 space-y-2">
+                <div className="flex justify-between items-end drop-shadow-sm"><p className="text-xs font-bold opacity-90 uppercase tracking-widest">Intake: {totals.calories}</p><p className="text-[10px] opacity-80">Goal: {safeDailyGoal}</p></div>
+                <div className="w-full h-2.5 bg-white/20 rounded-full overflow-hidden border border-white/30 shadow-inner"><div className={`h-full ${th.bg} transition-all duration-1000 ease-out`} style={{ width: `${Math.min((totals.calories / safeDailyGoal) * 100, 100)}%` }}></div></div>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Tab Content */}
-        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-          
-          {searchQuery && searchResults.length > 0 && searchMode === 'db' ? (
-            <div className="space-y-2">
-              <div className="text-xs font-bold text-slate-400 uppercase mb-2 px-2">Search Results</div>
-              {searchResults.map((food, idx) => (
-                <div key={idx} onClick={() => { setSelectedFoodForEdit(food); setQuantity(1); }} className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl hover:border-indigo-200 cursor-pointer">
-                  <div className="flex-1 mr-4"><p className="text-sm font-bold dark:text-white line-clamp-1">{food.description}</p><p className="text-[10px] text-slate-400 uppercase">{food.brandOwner || 'Generic'}</p></div>
-                  <div className="text-indigo-600 font-bold text-sm">{Math.round(food.foodNutrients?.find(n => n.nutrientId === 1008)?.value || 0)} <span className="text-[8px] font-normal text-slate-400">kcal</span></div>
-                </div>
-              ))}
+        {/* --- GLOBAL DATE PICKER MODAL --- */}
+        {isDatePickerOpen && (
+          <div className="absolute inset-0 z-[60] bg-slate-950/60 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
+            <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl w-full rounded-[40px] shadow-2xl p-6 space-y-4 border border-white/20 dark:border-slate-700/50">
+               <div className="flex justify-between items-center px-2">
+                  <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest">{pickerMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h3>
+                  <div className="flex gap-1">
+                    <button onClick={() => setPickerMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))} className="p-2"><ChevronLeft size={18} className="dark:text-white"/></button>
+                    <button onClick={() => setPickerMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))} className="p-2"><ChevronRight size={18} className="dark:text-white"/></button>
+                  </div>
+               </div>
+               <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-black text-slate-400">
+                  {['S','M','T','W','T','F','S'].map((d, i) => <div key={i}>{d}</div>)}
+               </div>
+               <div className="grid grid-cols-7 gap-1.5">
+                  {(() => {
+                    const year = pickerMonth.getFullYear(), m = pickerMonth.getMonth();
+                    const days = [], first = new Date(year, m, 1).getDay(), total = new Date(year, m+1, 0).getDate();
+                    for(let i=0; i<first; i++) days.push(null);
+                    for(let i=1; i<=total; i++) days.push({day: i, date: `${year}-${String(m+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`});
+                    return days;
+                  })().map((d, i) => {
+                    if (!d) return <div key={`empty-${i}`}></div>;
+                    
+                    const isToday = d.date === new Date().toISOString().split('T')[0];
+                    const isSelected = selectedDate === d.date;
+                    
+                    let btnClasses = 'aspect-square rounded-xl text-xs font-black flex items-center justify-center transition-all active:scale-90 ';
+                    if (isSelected) {
+                        btnClasses += `${th.bg} text-white shadow-lg shadow-black/20 `;
+                    } else {
+                        btnClasses += 'bg-slate-100/50 dark:bg-slate-800/50 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700 ';
+                    }
+                    if (isToday && !isSelected) {
+                        btnClasses += `ring-2 ${th.ring} ring-offset-1 dark:ring-offset-slate-900 `;
+                    }
+
+                    return (
+                      <button key={d.date} onClick={() => { setSelectedDate(d.date); setIsDatePickerOpen(false); }} className={btnClasses}>
+                        {d.day}
+                      </button>
+                    );
+                  })}
+               </div>
+               <div className="flex gap-2 pt-2">
+                  <button onClick={() => { setSelectedDate(new Date().toISOString().split('T')[0]); setIsDatePickerOpen(false); }} className={`flex-1 py-4 ${th.bgLight} ${th.text} rounded-2xl font-black text-xs uppercase tracking-widest transition-colors`}>Today</button>
+                  <button onClick={() => setIsDatePickerOpen(false)} className="flex-1 py-4 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-black text-xs uppercase tracking-widest transition-colors">Cancel</button>
+               </div>
             </div>
-          ) : activeTab === 'routineBuilder' ? (
-            <div className="space-y-6">
-              <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-indigo-100 dark:border-slate-800 shadow-sm mb-4">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Routine Name</label>
-                <SafeInput type="text" autoComplete="off" spellCheck="false" placeholder="e.g. Work Day Routine..." className="w-full text-lg font-bold border-b-2 border-indigo-100 dark:border-slate-700 focus:border-indigo-500 dark:focus:border-indigo-500 focus:outline-none py-2 bg-transparent dark:text-white" value={builderName} onChange={setBuilderName} />
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2 mt-4">Auto-Apply Days</label>
-                <div className="flex justify-between gap-1">
-                  {['S','M','T','W','T','F','S'].map((day, idx) => (<button key={idx} onClick={() => setBuilderAutoDays(prev => prev.includes(idx) ? prev.filter(d => d !== idx) : [...prev, idx])} className={`w-8 h-8 rounded-full text-xs font-bold ${builderAutoDays.includes(idx) ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>{day}</button>))}
+          </div>
+        )}
+
+        {/* --- DYNAMIC TAB CONTENT --- */}
+        <div className={`flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar transition-colors duration-1000 relative z-10 rounded-t-[40px] border-t border-white/40 dark:border-slate-700/50 shadow-[0_-10px_40px_rgba(0,0,0,0.2)] ${isDarkMode ? 'bg-slate-950/85 backdrop-blur-2xl' : 'bg-white/85 backdrop-blur-2xl'}`}>
+          
+          {isBuilding ? (
+            /* BUILDER UI */
+            <div className="space-y-6 animate-in slide-in-from-bottom-4 pb-10">
+              <div className="flex justify-between items-center"><h2 className="text-2xl font-black dark:text-white">Routine Builder</h2><button onClick={() => setIsBuilding(false)} className="p-2 bg-slate-200/50 dark:bg-slate-800/50 rounded-full text-slate-500 hover:text-rose-500 transition-colors"><X size={20}/></button></div>
+              
+              <input placeholder="Name Your Routine..." className="w-full p-5 rounded-3xl bg-white/60 dark:bg-slate-900/60 dark:text-white font-black text-lg border border-white/20 dark:border-slate-700/50 focus:outline-none" value={builderName} onChange={e => setBuilderName(e.target.value)} />
+              
+              <div className="space-y-3">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-2">Repeat Weekly On</p>
+                <div className="flex justify-between gap-1 bg-white/50 dark:bg-slate-900/50 p-1.5 rounded-[24px] border border-white/20 dark:border-slate-700/50">
+                  {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day => (
+                    <button key={day} onClick={() => setBuilderDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day])} className={`flex-1 py-3 text-[10px] font-black rounded-xl transition-all ${builderDays.includes(day) ? `${th.bg} text-white shadow-md` : 'text-slate-500'}`}>{day}</button>
+                  ))}
                 </div>
               </div>
+
+              <div className="pt-2 border-t border-slate-200/50 dark:border-slate-700/50">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-2 mb-3">Add Foods to Routine</p>
+                {renderSearchEngineUI()}
+              </div>
+
               <div className="space-y-2">
-                <h3 className="text-sm font-bold flex justify-between dark:text-white">Routine Items<span className="text-indigo-600">{builderItems.reduce((s,i) => s + i.calories, 0)} kcal</span></h3>
-                {builderItems.length === 0 ? <div className="p-8 text-center text-slate-400 text-sm border-2 border-dashed border-slate-200 rounded-2xl">Search above to add foods!</div> : builderItems.map(item => (
-                  <div key={item.id} className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-100 dark:border-slate-800 flex flex-col gap-2">
-                    <div className="flex justify-between items-start">
-                      <div><p className="text-sm font-bold dark:text-white">{item.name}</p><p className="text-[10px] text-slate-400">{item.portion}</p></div>
-                      <div className="flex items-center gap-3"><span className="text-xs font-bold text-indigo-600">{item.calories}</span><button onClick={() => setBuilderItems(builderItems.filter(i => i.id !== item.id))} className="text-slate-300 hover:text-red-500"><Trash2 size={14} /></button></div>
-                    </div>
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">{(builderItems || []).length} Planned Items</p>
+                {(builderItems || []).map(item => (
+                  <div key={item.id} className="flex justify-between items-center p-4 bg-white/60 dark:bg-slate-900/60 rounded-3xl border border-white/20 dark:border-slate-700/50">
+                    <div><p className="text-sm font-bold dark:text-white">{item.name}</p><p className={`text-[10px] ${th.text} font-bold uppercase tracking-widest`}>{item.mealType} • {item.calories} kcal</p></div>
+                    <button onClick={() => setBuilderItems(builderItems.filter(i => i.id !== item.id))} className="p-2 text-slate-400 hover:text-rose-500 transition-colors"><X size={18}/></button>
                   </div>
                 ))}
               </div>
-              <div className="pt-4 flex gap-3">
-                <button onClick={() => { resetRoutineForm(); setActiveTab('routines'); }} className="flex-1 py-3 rounded-xl font-bold bg-slate-100 dark:bg-slate-800 dark:text-white">Cancel</button>
-                <button onClick={saveRoutine} disabled={!builderName.trim() || builderItems.length === 0} className="flex-[2] py-3 rounded-xl font-bold text-white bg-indigo-600 disabled:opacity-50"><Save size={18} className="inline mr-2"/> {editingRoutineId ? 'Update' : 'Save'}</button>
-              </div>
+              <button onClick={saveRoutine} className={`w-full py-5 ${th.bg} text-white rounded-3xl font-black text-lg shadow-xl ${th.shadow} flex items-center justify-center gap-3 transition-transform active:scale-95`}><Save /> Save Routine</button>
             </div>
-          ) : activeTab === 'routines' ? (
-             <div className="space-y-4">
-               <button onClick={() => { resetRoutineForm(); setActiveTab('routineBuilder'); }} className="w-full py-4 border-2 border-dashed border-indigo-200 text-indigo-600 font-bold rounded-2xl"><Plus size={20} className="inline mr-2"/> Create New Routine</button>
-               {routines.map(routine => (
-                 <div key={routine.id} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-4">
-                   <div className="flex justify-between items-start mb-4">
-                     <div>
-                       <h3 className="font-bold dark:text-white">{routine.name}</h3>
-                       <p className="text-xs text-slate-500">{routine.items.length} items • {routine.items.reduce((s,i)=>s+i.calories,0)} kcal</p>
-                     </div>
-                     <div className="flex gap-2">
-                       <button onClick={() => { setBuilderName(routine.name); setBuilderItems(routine.items); setBuilderAutoDays(routine.autoDays || []); setEditingRoutineId(routine.id); setActiveTab('routineBuilder'); }} className="p-2 bg-slate-50 dark:bg-slate-800 rounded-lg"><Pencil size={16}/></button>
-                       <button onClick={() => updateDB('routines', routine.id, null, true)} className="p-2 bg-slate-50 dark:bg-slate-800 text-red-500 rounded-lg"><Trash2 size={16}/></button>
-                     </div>
-                   </div>
-                   <button onClick={() => applyRoutine(routine)} className="w-full py-2 bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 font-bold rounded-xl text-sm">Apply to Today</button>
-                 </div>
-               ))}
-             </div>
+            
           ) : activeTab === 'log' ? (
-            <>
-              {renderMealSection('Breakfast', Coffee, 'Breakfast', 'amber')}
-              {renderMealSection('Lunch', Sun, 'Lunch', 'sky')}
-              {renderMealSection('Dinner', Moon, 'Dinner', 'indigo')}
-              {renderMealSection('Snacks', Cookie, 'Snacks', 'rose')}
-            </>
-          ) : activeTab === 'stats' ? (
-            <div className="space-y-6">
-               <section className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
-                 <h3 className="font-bold mb-4 flex items-center gap-2 dark:text-white"><Activity size={18} /> Daily Macros</h3>
-                 <div className="space-y-4">
-                   <div className="mb-4">
-                     <div className="flex justify-between text-xs font-semibold mb-1 text-slate-500 dark:text-slate-400"><span>Protein</span><span>{totals.protein} / {userProfile.proteinGoal}g</span></div>
-                     <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden"><div className="h-full bg-gradient-to-r from-rose-400 to-pink-500 transition-all duration-500" style={{ width: `${Math.min((totals.protein/userProfile.proteinGoal)*100, 100)}%` }} /></div>
-                   </div>
-                   <div className="mb-4">
-                     <div className="flex justify-between text-xs font-semibold mb-1 text-slate-500 dark:text-slate-400"><span>Carbs</span><span>{totals.carbs} / {userProfile.carbsGoal}g</span></div>
-                     <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden"><div className="h-full bg-gradient-to-r from-sky-400 to-blue-500 transition-all duration-500" style={{ width: `${Math.min((totals.carbs/userProfile.carbsGoal)*100, 100)}%` }} /></div>
-                   </div>
-                   <div className="mb-4">
-                     <div className="flex justify-between text-xs font-semibold mb-1 text-slate-500 dark:text-slate-400"><span>Fat</span><span>{totals.fat} / {userProfile.fatGoal}g</span></div>
-                     <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden"><div className="h-full bg-gradient-to-r from-amber-400 to-orange-500 transition-all duration-500" style={{ width: `${Math.min((totals.fat/userProfile.fatGoal)*100, 100)}%` }} /></div>
-                   </div>
-                 </div>
-               </section>
-               <section className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100 dark:border-slate-800">
-                  <div className="flex justify-between items-center"><label className="text-sm font-bold dark:text-white">Dark Mode</label><button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-xl transition-colors">{isDarkMode ? <Moon size={18}/> : <Sun size={18}/>}</button></div>
-               </section>
-            </div>
-          ) : activeTab === 'plan' ? (
-            <div className="space-y-6">
-              <div className="bg-indigo-600 text-white p-6 rounded-3xl shadow-xl">
-                 <h2 className="text-xl font-bold mb-2">AI Meal Planner</h2>
-                 <p className="text-xs opacity-80 mb-4">Select diets and let AI plan your perfect day.</p>
-                 <div className="flex flex-wrap gap-2 mb-4">
-                   {(userProfile.customDiets || defaultDiets).map(d => (
-                     <div key={d} onClick={() => setSelectedDiets(p => p.includes(d) ? p.filter(x=>x!==d) : [...p, d])} className={`px-3 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer ${selectedDiets.includes(d) ? 'bg-white text-indigo-600 border-white' : 'border-white/30 text-white/80'}`}>{d}</div>
-                   ))}
-                 </div>
-                 <button onClick={generateMealPlan} disabled={isGeneratingPlan} className="w-full bg-white text-indigo-600 font-bold py-3 rounded-2xl shadow-lg disabled:opacity-50 transition-all">{isGeneratingPlan ? 'Building...' : 'Generate Plan'}</button>
-              </div>
-            </div>
-          ) : activeTab === 'trends' ? (
-            <div className="space-y-8">
-              <div>
-                <h2 className="text-xl font-bold dark:text-white mb-6 flex items-center gap-2"><BarChart3 size={24} className="text-indigo-600" /> 7-Day Trends</h2>
-                <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-100 dark:border-slate-800 h-64 flex items-end justify-between gap-2">
-                  {weeklyTrends.days.map((day, idx) => {
-                    const pct = Math.min((day.calories / userProfile.dailyGoal) * 100, 100);
-                    return (
-                      <div key={idx} className="flex flex-col items-center flex-1 h-full justify-end">
-                        <div className="relative w-full flex justify-center h-full items-end">
-                           <div className={`w-3/4 rounded-t-md transition-all duration-700 ${idx === 6 ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'}`} style={{ height: `${pct}%`, minHeight: '4px' }} />
+            /* DAILY LOG TAB */
+            <div className="space-y-6 animate-in fade-in pb-6">
+              {renderSearchEngineUI()}
+
+              {todayRoutines.length > 0 && (dailyLog || []).filter(i => i.date === selectedDate).length === 0 && (
+                <div className={`${th.bgLight} p-5 rounded-[32px] border ${th.border} flex items-center justify-between group shadow-sm`}>
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-white dark:bg-slate-800 rounded-2xl shadow-sm"><Sparkle size={18} className={`${th.text} animate-pulse`} /></div>
+                    <div><p className={`text-[10px] font-black ${th.text} uppercase tracking-widest opacity-80`}>Scheduled Today</p><h4 className="text-sm font-bold dark:text-white">{todayRoutines[0]?.name}</h4></div>
+                  </div>
+                  <button onClick={() => handleApplyRoutine(todayRoutines[0])} className={`px-5 py-2 ${th.bg} text-white rounded-xl font-bold text-xs shadow-md active:scale-95 transition-transform`}>Apply All</button>
+                </div>
+              )}
+
+              {/* Meal Sections */}
+              {['Breakfast', 'Lunch', 'Dinner', 'Snacks'].map(m => (
+                <div key={m} className="space-y-3">
+                  <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2"><div className={`w-2.5 h-2.5 rounded-full ${th.bg} shadow-md`}></div>{m}</h3>
+                  <div className="space-y-2">
+                    {(dailyLog || []).filter(i => i.date === selectedDate && i.mealType === m).map(item => (
+                      <div key={item.id} className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm p-4 rounded-[32px] flex justify-between items-center shadow-sm border border-white/40 dark:border-slate-700/50 transition-all">
+                        <div className="flex items-center gap-4">
+                          <button onClick={() => updateDB('dailyLog', item.id, { ...item, isEaten: !item.isEaten })} className="transition-transform active:scale-75">
+                            {item.isEaten !== false ? <CheckCircle2 className={th.text} size={24} /> : <Circle className="text-slate-300 dark:text-slate-600" size={24} />}
+                          </button>
+                          <div className={item.isEaten === false ? 'opacity-40 line-through' : ''}>
+                            <p className="text-sm font-bold dark:text-white">{item.name}</p>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase">{item.calories} kcal</p>
+                          </div>
                         </div>
-                        <div className="text-[10px] font-bold mt-2 text-slate-400">{day.label}</div>
+                        <button onClick={() => updateDB('dailyLog', item.id, null, true)} className="p-2 text-slate-300 hover:text-rose-400 transition-colors"><Trash2 size={18}/></button>
                       </div>
-                    )
+                    ))}
+                    {(dailyLog || []).filter(i => i.date === selectedDate && i.mealType === m).length === 0 && (
+                      <p className="text-[10px] font-bold text-slate-400/70 dark:text-slate-600 uppercase tracking-widest italic py-2 pl-4">Empty</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+          ) : activeTab === 'routines' ? (
+            /* ROUTINES TAB */
+            <div className="space-y-4 animate-in fade-in pb-6">
+              <button onClick={() => { setIsBuilding(true); setEditingRoutineId(null); setBuilderName(''); setBuilderItems([]); setSearchQuery(''); setSearchResults([]); setCustomCalories(''); }} className={`w-full py-5 border-2 border-dashed ${th.border} ${th.text} rounded-[32px] font-black tracking-wide text-sm flex items-center justify-center gap-3 hover:${th.bgLight} transition-colors`}>
+                <div className="p-1 bg-white dark:bg-slate-800 rounded-lg shadow-sm"><Plus size={18}/></div> Create New Routine
+              </button>
+              
+              {(routines || []).length === 0 && (
+                <div className="text-center py-12 px-6 border border-white/20 dark:border-slate-800/50 rounded-[40px] bg-white/30 dark:bg-slate-900/30">
+                  <p className="text-slate-500 text-sm font-bold">No routines yet.</p>
+                  <p className="text-slate-400 text-xs mt-2">Create one to quickly log repeated meals!</p>
+                </div>
+              )}
+
+              {(routines || []).map(r => {
+                if (!r) return null;
+                const isApplied = (dailyLog || []).some(log => log.date === selectedDate && log.routineId === r.id);
+                return (
+                  <div key={r.id} className="p-6 bg-white/60 dark:bg-slate-900/60 rounded-[40px] border border-white/40 dark:border-slate-700/50 shadow-sm space-y-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="font-black text-lg dark:text-white leading-tight">{r.name || 'Untitled Routine'}</h4>
+                        <div className="flex gap-1.5 mt-2">
+                          {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => <span key={d} className={`text-[8px] font-black uppercase ${r.days?.includes(d) ? th.text : 'text-slate-400 dark:text-slate-600'}`}>{d}</span>)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 py-2 border-y border-slate-200/50 dark:border-slate-700/50">
+                      <div className="flex-1 text-center border-r border-slate-200/50 dark:border-slate-700/50"><p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em]">Energy</p><p className={`text-sm font-black ${th.text}`}>{(r.items || []).reduce((s,i)=>s+Number(i.calories), 0)} kcal</p></div>
+                      <div className="flex-1 text-center"><p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em]">Total Items</p><p className="text-sm font-black dark:text-white">{(r.items || []).length}</p></div>
+                    </div>
+                    <div className="flex gap-2">
+                      {isApplied ? (
+                        <button onClick={() => handleRemoveRoutine(r.id)} className="flex-1 py-3 bg-rose-50 text-rose-600 dark:bg-rose-900/30 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-transform active:scale-95"><X size={16}/> Remove</button>
+                      ) : (
+                        <button onClick={() => handleApplyRoutine(r)} className={`flex-1 py-3 ${th.bgLight} ${th.text} rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-transform active:scale-95`}><CheckCircle2 size={16}/> Apply</button>
+                      )}
+                      <button onClick={() => { setEditingRoutineId(r.id); setBuilderName(r.name || ''); setBuilderItems(r.items || []); setBuilderDays(r.days || []); setSearchQuery(''); setSearchResults([]); setIsBuilding(true); }} className="p-3 bg-white dark:bg-slate-800 rounded-2xl text-slate-400 hover:text-indigo-600 transition-colors shadow-sm"><Pencil size={18}/></button>
+                      <button onClick={() => updateDB('routines', r.id, null, true)} className="p-3 bg-white dark:bg-slate-800 rounded-2xl text-slate-400 hover:text-rose-500 transition-colors shadow-sm"><Trash2 size={18}/></button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            
+          ) : activeTab === 'plan' ? (
+            /* HISTORY TAB */
+            <div className="space-y-6 animate-in fade-in pb-6">
+              <div className="flex items-center gap-3"><CalendarDays className={th.text} size={24} /><h3 className="font-black text-xl dark:text-white tracking-tight">Activity Log</h3></div>
+              
+              <div className="bg-white/60 dark:bg-slate-900/60 p-5 rounded-[40px] border border-white/40 dark:border-slate-700/50 shadow-sm">
+                <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-200/50 dark:border-slate-700/50">
+                   <h3 className="font-black text-sm uppercase tracking-widest text-slate-600 dark:text-slate-300">{calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h3>
+                   <div className="flex gap-1">
+                     <button onClick={() => setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))} className="p-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm"><ChevronLeft size={14} className="dark:text-white"/></button>
+                     <button onClick={() => setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))} className="p-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm"><ChevronRight size={14} className="dark:text-white"/></button>
+                   </div>
+                </div>
+                <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
+                  {['S','M','T','W','T','F','S'].map((d, i) => <div key={i}>{d}</div>)}
+                </div>
+                <div className="grid grid-cols-7 gap-2.5">
+                  {(() => {
+                    const year = calendarMonth.getFullYear(), m = calendarMonth.getMonth();
+                    const days = [], first = new Date(year, m, 1).getDay(), total = new Date(year, m+1, 0).getDate();
+                    for(let i=0; i<first; i++) days.push(null);
+                    for(let i=1; i<=total; i++) {
+                      const dStr = `${year}-${String(m+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+                      const cal = (dailyLog || []).filter(l => l.date === dStr && l.isEaten !== false).reduce((s,x)=>s+(Number(x.calories)||0),0);
+                      days.push({ day: i, date: dStr, total: cal });
+                    }
+                    return days;
+                  })().map((d, i) => {
+                    if (!d) return <div key={`empty-${i}`}></div>;
+                    
+                    const isToday = d.date === new Date().toISOString().split('T')[0];
+                    const isSelected = viewingHistoryDetail === d.date;
+                    const hasData = d.total > 0;
+                    const isOver = d.total > safeDailyGoal;
+
+                    let baseBg = 'bg-white/50 dark:bg-slate-800/30';
+                    let baseText = 'text-slate-500 dark:text-white';
+                    let border = 'border border-transparent dark:border-slate-700/50';
+
+                    if (hasData) {
+                      if (isOver) {
+                        baseBg = 'bg-rose-100 dark:bg-rose-500/30';
+                        baseText = 'text-rose-600 dark:text-white';
+                        border = 'border border-rose-200 dark:border-rose-400/50';
+                      } else {
+                        baseBg = `${th.bgLight}`;
+                        baseText = `${th.text} dark:text-white`;
+                        border = `border ${th.border}`;
+                      }
+                    }
+
+                    let ringClass = '';
+                    if (isSelected) ringClass = `ring-2 ${th.ring} ring-offset-2 dark:ring-offset-slate-900 z-10`;
+                    else if (isToday) ringClass = 'ring-2 ring-emerald-400 dark:ring-emerald-500 ring-offset-2 dark:ring-offset-slate-900 z-10';
+
+                    return (
+                      <button key={d.date} onClick={() => setViewingHistoryDetail(d.date)} className={`aspect-square rounded-2xl flex flex-col items-center justify-center transition-all active:scale-90 shadow-sm ${baseBg} ${baseText} ${border} ${ringClass}`}>
+                        <span className="text-[12px] font-black">{d.day}</span>
+                      </button>
+                    );
                   })}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-indigo-50 dark:bg-indigo-900/30 p-4 rounded-2xl"><div className="text-[10px] font-bold text-indigo-400 uppercase">Avg Calories</div><div className="text-2xl font-black text-indigo-700">{weeklyTrends.avgCals}</div></div>
-              </div>
-            </div>
-          ) : null}
-        </div>
 
-        {/* Navigation */}
-        <div className="shrink-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-100 dark:border-slate-800 flex justify-between px-8 py-4 z-20 transition-colors duration-300">
-          <button onClick={() => setActiveTab('log')} className={activeTab === 'log' ? 'text-indigo-600' : 'text-slate-400'}><Clock size={20}/></button>
-          <button onClick={() => setActiveTab('routines')} className={activeTab === 'routines' || activeTab === 'routineBuilder' ? 'text-indigo-600' : 'text-slate-400'}><ListChecks size={20}/></button>
-          <button onClick={() => setActiveTab('plan')} className={activeTab === 'plan' ? 'text-indigo-600' : 'text-slate-400'}><CalendarDays size={20}/></button>
-          <button onClick={() => setActiveTab('trends')} className={activeTab === 'trends' ? 'text-indigo-600' : 'text-slate-400'}><BarChart3 size={20}/></button>
-          <button onClick={() => setActiveTab('stats')} className={activeTab === 'stats' ? 'text-indigo-600' : 'text-slate-400'}><Scale size={20}/></button>
-        </div>
-
-        {/* Quick Add Modal */}
-        {showQuickAdd && (
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end justify-center p-4">
-            <div className="bg-white dark:bg-slate-900 w-full rounded-3xl p-6 shadow-2xl">
-              <div className="flex justify-between items-start mb-4">
-                <h2 className="font-bold text-lg dark:text-white">Quick Add</h2>
-                <button onClick={() => { setShowQuickAdd(false); resetQuickAddForm(); }} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={16}/></button>
-              </div>
-              <div className="space-y-4">
-                <SafeInput type="text" placeholder="Food Name" value={quickAddData.name} onChange={v => setQuickAddData({...quickAddData, name: v})} className="w-full bg-slate-50 dark:bg-slate-800 rounded-xl px-4 py-3 text-sm dark:text-white" />
-                <div className="grid grid-cols-2 gap-3">
-                  <SafeInput type="number" placeholder="Calories" value={quickAddData.calories} onChange={v => setQuickAddData({...quickAddData, calories: v})} className="w-full bg-slate-50 dark:bg-slate-800 rounded-xl px-4 py-3 text-sm dark:text-white" />
-                  <SafeInput type="number" placeholder="Protein (g)" value={quickAddData.protein} onChange={v => setQuickAddData({...quickAddData, protein: v})} className="w-full bg-slate-50 dark:bg-slate-800 rounded-xl px-4 py-3 text-sm dark:text-white" />
-                  <SafeInput type="number" placeholder="Carbs (g)" value={quickAddData.carbs} onChange={v => setQuickAddData({...quickAddData, carbs: v})} className="w-full bg-slate-50 dark:bg-slate-800 rounded-xl px-4 py-3 text-sm dark:text-white" />
-                  <SafeInput type="number" placeholder="Fat (g)" value={quickAddData.fat} onChange={v => setQuickAddData({...quickAddData, fat: v})} className="w-full bg-slate-50 dark:bg-slate-800 rounded-xl px-4 py-3 text-sm dark:text-white" />
+              {/* History Detail Overlay */}
+              {viewingHistoryDetail && (
+                <div className={`p-6 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-2 ${th.border} rounded-[40px] animate-in slide-in-from-top-4 shadow-xl`}>
+                   <div className="flex justify-between items-center border-b border-slate-200/50 dark:border-slate-700/50 pb-4 mb-4">
+                     <h4 className="font-black text-xs uppercase tracking-[0.2em] dark:text-white">{new Date(viewingHistoryDetail + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' })}</h4>
+                     <button onClick={() => setViewingHistoryDetail(null)} className="p-2 bg-white dark:bg-slate-800 rounded-full shadow-sm"><X size={16}/></button>
+                   </div>
+                   <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-2">
+                     {(dailyLog || []).filter(l => l.date === viewingHistoryDetail).map(item => (
+                       <div key={item.id} className="flex justify-between items-center p-4 bg-white/90 dark:bg-slate-800/90 rounded-[24px] shadow-sm border border-slate-100 dark:border-slate-700/50">
+                         <span className="text-xs font-bold dark:text-white truncate mr-4">{item.name}</span>
+                         <span className={`text-xs font-black ${th.text} whitespace-nowrap`}>{item.calories} kcal</span>
+                       </div>
+                     ))}
+                     {(dailyLog || []).filter(l => l.date === viewingHistoryDetail).length === 0 && <p className="text-center text-[10px] text-slate-400 font-bold uppercase tracking-widest py-6">No food logged</p>}
+                   </div>
                 </div>
-                <div className="grid grid-cols-4 gap-2 mt-2">
-                  {['Breakfast', 'Lunch', 'Dinner', 'Snacks'].map(type => (
-                    <button key={type} onClick={() => setMealType(type)} className={`py-2 rounded-xl text-[10px] font-bold border ${mealType === type ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-800 text-slate-500'}`}>{type}</button>
-                  ))}
-                </div>
-                <button onClick={handleQuickAddAction} disabled={!quickAddData.name || !quickAddData.calories} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold mt-4 disabled:opacity-50">Add Custom Food</button>
-              </div>
+              )}
             </div>
-          </div>
-        )}
+            
+          ) : (
+            /* SETTINGS TAB */
+            <div className="space-y-6 animate-in fade-in pb-6">
+               <div className="flex items-center gap-3"><Settings className={th.text} size={24} /><h3 className="font-black text-xl dark:text-white tracking-tight">App Settings</h3></div>
 
-        {/* Edit Food Modal */}
-        {selectedFoodForEdit && (
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end justify-center p-4">
-             <div className="bg-white dark:bg-slate-900 w-full rounded-3xl p-6 shadow-2xl">
-               <div className="flex justify-between items-start mb-4">
-                 <div><h2 className="font-bold text-lg dark:text-white line-clamp-1">{selectedFoodForEdit.description}</h2></div>
-                 <button onClick={() => setSelectedFoodForEdit(null)} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={16}/></button>
-               </div>
-               <div className="space-y-6">
-                 <div className="grid grid-cols-4 gap-2">{['Breakfast', 'Lunch', 'Dinner', 'Snacks'].map(type => (<button key={type} onClick={() => setMealType(type)} className={`py-2 rounded-xl text-[10px] font-bold border ${mealType === type ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-800 text-slate-500'}`}>{type}</button>))}</div>
-                 <div>
-                   <div className="flex justify-between items-center mb-2"><label className="text-xs font-bold text-slate-400">Servings</label><span className="text-lg font-bold text-indigo-600">{quantity}x</span></div>
-                   <input type="range" min="0.25" max="5" step="0.25" value={quantity} onChange={(e) => setQuantity(parseFloat(e.target.value))} className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-indigo-600" />
-                 </div>
-                 <button onClick={handleAddItemAction} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold">Add to {activeTab === 'routineBuilder' ? 'Routine' : 'Log'}</button>
-               </div>
-             </div>
-          </div>
-        )}
-
-        {/* AI Insight Modal */}
-        {showAiModal && (
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md z-[60] flex items-center justify-center p-6">
-            <div className="bg-white dark:bg-slate-900 w-full rounded-3xl overflow-hidden shadow-2xl">
-              <div className="bg-indigo-600 p-4 text-white flex justify-between"><h3 className="font-bold">✨ AI Coach</h3><button onClick={() => setShowAiModal(false)}><X size={20} /></button></div>
-              <div className="p-6">
-                {isAiLoading ? <p className="text-center">Analyzing data...</p> : aiCoachResponse ? (
-                  <div className="space-y-4">
-                    <div className="text-center font-bold text-indigo-600 bg-indigo-50 rounded-full py-1">{aiCoachResponse.rating}</div>
-                    {aiCoachResponse.advice.map((tip, i) => <div key={i} className="text-sm dark:text-white bg-slate-50 dark:bg-slate-800 p-3 rounded-xl">{tip}</div>)}
+               {/* Nutrition Profile */}
+               <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm p-6 rounded-[32px] border border-white/40 dark:border-slate-700/50 space-y-6 shadow-sm">
+                  <h4 className="text-xs font-black uppercase text-slate-500 tracking-[0.2em] mb-4 flex items-center gap-2"><Target size={14}/> Nutrition Targets</h4>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] px-1 block text-center">Daily Calorie Goal</label>
+                    <SafeInput type="number" className={`w-full p-4 bg-white dark:bg-slate-800 rounded-2xl dark:text-white font-black text-2xl text-center shadow-sm border border-slate-100 dark:border-slate-700 focus:border-transparent focus:ring-2 ${th.ring}`} value={userProfile?.dailyGoal ?? 2000} onChange={v => handleProfileUpdate('dailyGoal', v)} />
                   </div>
-                ) : <p className="text-center text-red-500">{aiError}</p>}
-              </div>
-            </div>
-          </div>
-        )}
 
-        {/* Drag Ghost Overlay */}
-        {touchDrag && (
-          <div ref={ghostRef} className="fixed top-0 left-0 z-[100] bg-white dark:bg-slate-800 p-4 rounded-3xl border-2 border-indigo-500 shadow-2xl w-64 opacity-95 pointer-events-none will-change-transform" style={{ transform: `translate3d(${touchDrag.initialX-30}px, ${touchDrag.initialY-30}px, 0)` }}>
-            <p className="text-sm font-bold dark:text-white truncate">{touchDrag.item.name}</p>
-            <p className="text-[10px] text-slate-400 font-black uppercase">{touchDrag.item.calories} kcal</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { l: 'Protein (g)', k: 'proteinGoal', c: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-900/20', def: 150 },
+                      { l: 'Carbs (g)', k: 'carbsGoal', c: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-900/20', def: 250 },
+                      { l: 'Fat (g)', k: 'fatGoal', c: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20', def: 65 }
+                    ].map(g => (
+                      <div key={g.k} className="space-y-2">
+                        <label className={`text-[9px] font-black uppercase text-center block ${g.c}`}>{g.l}</label>
+                        <SafeInput type="number" className={`w-full p-3 ${g.bg} rounded-xl dark:text-white font-black text-center shadow-sm border border-white/50 dark:border-transparent focus:outline-none focus:ring-2 focus:ring-slate-300`} value={userProfile?.[g.k] ?? g.def} onChange={v => handleProfileUpdate(g.k, v)} />
+                      </div>
+                    ))}
+                  </div>
+               </div>
+
+               {/* Personal Metrics */}
+               <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm p-6 rounded-[32px] border border-white/40 dark:border-slate-700/50 space-y-6 shadow-sm">
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-xs font-black uppercase text-slate-500 tracking-[0.2em] flex items-center gap-2"><Scale size={14}/> Body Metrics</h4>
+                    <button onClick={() => handleProfileUpdate('units', userProfile?.units === 'kg' ? 'lbs' : 'kg', true)} className="text-[9px] font-black uppercase tracking-widest text-indigo-500 flex items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded-lg transition-transform active:scale-95"><RefreshCw size={10}/> Switch Units</button>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                     <div className="space-y-2">
+                        <label className="text-[9px] font-black uppercase text-center block text-slate-400 tracking-widest">Current ({userProfile?.units || 'lbs'})</label>
+                        <SafeInput type="number" className="w-full p-3 bg-white dark:bg-slate-800 rounded-xl dark:text-white font-black text-center shadow-sm border border-slate-100 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300" value={userProfile?.currentWeight ?? 150} onChange={v => handleProfileUpdate('currentWeight', v)} />
+                     </div>
+                     <div className="space-y-2">
+                        <label className={`text-[9px] font-black uppercase text-center block ${th.text} tracking-widest`}>Goal ({userProfile?.units || 'lbs'})</label>
+                        <SafeInput type="number" className={`w-full p-3 ${th.bgLight} rounded-xl dark:text-white font-black text-center shadow-sm border border-white/50 dark:border-transparent focus:outline-none focus:ring-2 ${th.ring}`} value={userProfile?.targetWeight ?? 140} onChange={v => handleProfileUpdate('targetWeight', v)} />
+                     </div>
+                  </div>
+                  
+                  <div className="pt-2 border-t border-white/40 dark:border-slate-700/50 mt-4">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-2 flex items-center gap-2 justify-center"><Droplets size={12} className="text-blue-500"/> Daily Water Goal (oz)</label>
+                    <SafeInput type="number" className="w-full p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl dark:text-white font-black text-xl text-center shadow-sm border border-blue-100 dark:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-300" value={userProfile?.waterGoal ?? 80} onChange={v => handleProfileUpdate('waterGoal', v)} />
+                  </div>
+               </div>
+
+               {/* Preferences */}
+               <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm p-6 rounded-[32px] border border-white/40 dark:border-slate-700/50 space-y-4 shadow-sm">
+                  <h4 className="text-xs font-black uppercase text-slate-500 tracking-[0.2em] mb-4 flex items-center gap-2"><Settings size={14}/> Preferences</h4>
+                  
+                  <button onClick={toggleTheme} className="w-full py-4 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center gap-3 font-bold text-slate-600 dark:text-slate-300 transition-transform active:scale-95 shadow-sm border border-slate-100 dark:border-slate-700">
+                    {isDarkMode ? <Sun size={18} className="text-amber-500" /> : <Moon size={18} className={th.text} />}
+                    {isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                  </button>
+               </div>
+            </div>
+          )}
+        </div>
+
+        {/* --- GLOBAL NAVIGATION (Frosted Pane) --- */}
+        {!isBuilding && (
+          <div className={`shrink-0 border-t border-white/40 dark:border-slate-700/50 flex justify-around py-5 pb-9 sm:pb-5 transition-all relative z-20 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] ${isDarkMode ? 'bg-slate-950/85 backdrop-blur-2xl' : 'bg-white/85 backdrop-blur-2xl'}`}>
+            <button onClick={() => setActiveTab('log')} className={activeTab === 'log' ? `${th.text} scale-125` : 'text-slate-400 hover:text-slate-500 dark:hover:text-slate-300'}><Clock size={24} strokeWidth={activeTab === 'log' ? 3 : 2}/></button>
+            <button onClick={() => setActiveTab('routines')} className={activeTab === 'routines' ? `${th.text} scale-125` : 'text-slate-400 hover:text-slate-500 dark:hover:text-slate-300'}><ListChecks size={24} strokeWidth={activeTab === 'routines' ? 3 : 2}/></button>
+            <button onClick={() => { setActiveTab('plan'); setViewingHistoryDetail(null); }} className={activeTab === 'plan' ? `${th.text} scale-125` : 'text-slate-400 hover:text-slate-500 dark:hover:text-slate-300'}><CalendarDays size={24} strokeWidth={activeTab === 'plan' ? 3 : 2}/></button>
+            <button onClick={() => setActiveTab('settings')} className={activeTab === 'settings' ? `${th.text} scale-125` : 'text-slate-400 hover:text-slate-500 dark:hover:text-slate-300'}><Settings size={24} strokeWidth={activeTab === 'settings' ? 3 : 2}/></button>
           </div>
         )}
       </div>
     </div>
   );
 };
+
+const App = () => (
+  <ErrorBoundary>
+    <TrackerApp />
+  </ErrorBoundary>
+);
 
 export default App;
