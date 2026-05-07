@@ -1,33 +1,39 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { 
   Search, Plus, Trash2, ChevronRight, ChevronLeft, ChevronDown, X,
   Clock, CalendarDays, ListChecks, CheckCircle2, Circle, Save, Pencil,
-  Loader2, TrendingUp, Target, Settings, Sparkle, Sun, Moon, AlertCircle, 
-  Scale, Droplets, RefreshCw
+  Loader2, Target, Settings, Sparkle, Sun, Moon, AlertCircle, 
+  Scale, Droplets, RefreshCw, Trophy, Medal, Flame
 } from 'lucide-react';
 
 // --- Configuration ---
 const APP_ID = 'calorie-tracker-v1';
 
-// AZURE DEPLOYMENT: Replace these strings with your import.meta.env variables before deploying to GitHub
+// AZURE DEPLOYMENT: These are your active keys
 const USDA_API_KEY = 'lkRdpKqn24LgJ3oDTYpLyXyQH7elck6d4GTiOR9Q'; 
-const apiKey = ""; 
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBSYiy dcnXeET0JG4TRDNPVoDKRgi5u2vs",
+  authDomain: "calorie-tracker-60896.firebaseapp.com",
+  projectId: "calorie-tracker-60896",
+  storageBucket: "calorie-tracker-60896.firebasestorage.app",
+  messagingSenderId: "1061772404332",
+  appId: "1:1061772404332:web:a209695d117146cf52da49",
+  measurementId: "G-L81H28LXG1"
+};
 
 // --- Firebase Initialization ---
-const firebaseConfig = {
-  apiKey: "YOUR_FIREBASE_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
-};
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app); }
+let auth = null, db = null;
+try {
+  const app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+} catch (e) {
+  console.error("Firebase Setup Error:", e);
+}
 
 // --- Aesthetic Theme Engine ---
 const COLORS = {
@@ -45,15 +51,15 @@ const getThemeForDate = (dateStr) => {
   const m = d.getMonth() + 1; 
   const day = d.getDate();
 
-  if (m === 12 && day >= 20) return { img: 'https://images.unsplash.com/photo-1512389142860-9c281c678a85?auto=format&fit=crop&w=800&q=80', color: COLORS.rose }; // Christmas
-  if (m === 10 && day >= 24) return { img: 'https://images.unsplash.com/photo-1508344928928-7137b29de216?auto=format&fit=crop&w=800&q=80', color: COLORS.amber }; // Halloween
-  if (m === 2 && day >= 10 && day <= 14) return { img: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=800&q=80', color: COLORS.rose }; // Valentines
-  if (m === 7 && day >= 1 && day <= 4) return { img: 'https://images.unsplash.com/photo-1531366936336-1e64df2ec2e0?auto=format&fit=crop&w=800&q=80', color: COLORS.blue }; // Independence
+  if (m === 12 && day >= 20) return { img: 'https://images.unsplash.com/photo-1512389142860-9c281c678a85?auto=format&fit=crop&w=800&q=80', color: COLORS.rose };
+  if (m === 10 && day >= 24) return { img: 'https://images.unsplash.com/photo-1508344928928-7137b29de216?auto=format&fit=crop&w=800&q=80', color: COLORS.amber };
+  if (m === 2 && day >= 10 && day <= 14) return { img: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=800&q=80', color: COLORS.rose };
+  if (m === 7 && day >= 1 && day <= 4) return { img: 'https://images.unsplash.com/photo-1531366936336-1e64df2ec2e0?auto=format&fit=crop&w=800&q=80', color: COLORS.blue };
 
-  if (m >= 3 && m <= 5) return { img: 'https://images.unsplash.com/photo-1490750967868-88aa4486c946?auto=format&fit=crop&w=800&q=80', color: COLORS.emerald }; // Spring
-  if (m >= 6 && m <= 8) return { img: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80', color: COLORS.sky }; // Summer
-  if (m >= 9 && m <= 11) return { img: 'https://images.unsplash.com/photo-1476820865390-c52aeebb9891?auto=format&fit=crop&w=800&q=80', color: COLORS.orange }; // Autumn
-  return { img: 'https://images.unsplash.com/photo-1483664852095-d6cc6870702d?auto=format&fit=crop&w=800&q=80', color: COLORS.indigo }; // Winter
+  if (m >= 3 && m <= 5) return { img: 'https://images.unsplash.com/photo-1490750967868-88aa4486c946?auto=format&fit=crop&w=800&q=80', color: COLORS.emerald };
+  if (m >= 6 && m <= 8) return { img: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80', color: COLORS.sky };
+  if (m >= 9 && m <= 11) return { img: 'https://images.unsplash.com/photo-1476820865390-c52aeebb9891?auto=format&fit=crop&w=800&q=80', color: COLORS.orange };
+  return { img: 'https://images.unsplash.com/photo-1483664852095-d6cc6870702d?auto=format&fit=crop&w=800&q=80', color: COLORS.indigo };
 };
 
 // --- Ultimate Error Boundary ---
@@ -74,7 +80,6 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// --- SafeInput ---
 const SafeInput = ({ value, onChange, ...props }) => {
   const [localVal, setLocalVal] = useState(value !== undefined && value !== null ? String(value) : '');
   useEffect(() => { setLocalVal(value !== undefined && value !== null ? String(value) : ''); }, [value]);
@@ -90,15 +95,15 @@ const SafeInput = ({ value, onChange, ...props }) => {
 };
 
 const TrackerApp = () => {
-  // Navigation & UI
   const [activeTab, setActiveTab] = useState('log'); 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [pickerMonth, setPickerMonth] = useState(new Date());
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [viewingHistoryDetail, setViewingHistoryDetail] = useState(null);
+  const searchInputRef = useRef(null);
+  const scrollContainerRef = useRef(null);
   
-  // Theme Management
   const currentTheme = useMemo(() => getThemeForDate(selectedDate), [selectedDate]);
   const th = currentTheme.color; 
   
@@ -113,22 +118,19 @@ const TrackerApp = () => {
     try { localStorage.setItem(`${APP_ID}_theme`, newTheme); } catch(e) {}
   };
 
-  // Search & USDA
   const [searchQuery, setSearchQuery] = useState('');
   const [searchMode, setSearchMode] = useState('db'); 
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [mealType, setMealType] = useState('Breakfast');
-  const [customCalories, setCustomCalories] = useState('');
+  const [customMacros, setCustomMacros] = useState({ calories: '', protein: '', carbs: '', fat: '' });
 
-  // Routine Builder
   const [isBuilding, setIsBuilding] = useState(false);
   const [editingRoutineId, setEditingRoutineId] = useState(null);
   const [builderName, setBuilderName] = useState('');
   const [builderDays, setBuilderDays] = useState(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
   const [builderItems, setBuilderItems] = useState([]);
 
-  // Data State
   const defaultProfile = { 
     dailyGoal: 2000, proteinGoal: 150, carbsGoal: 250, fatGoal: 65,
     currentWeight: 150, targetWeight: 140, waterGoal: 80, units: 'lbs'
@@ -138,7 +140,6 @@ const TrackerApp = () => {
   const [routines, setRoutines] = useState([]);
   const [userProfile, setUserProfile] = useState(defaultProfile);
 
-  // --- USDA API Search ---
   const searchUSDA = async (query) => {
     if (!query || query.length < 3) { setSearchResults([]); return; }
     setIsSearching(true);
@@ -167,7 +168,6 @@ const TrackerApp = () => {
     return () => clearTimeout(timer);
   }, [searchQuery, searchMode]);
 
-  // --- Sync Logic & Optimistic Updates ---
   useEffect(() => {
     if (!auth) return;
     return onAuthStateChanged(auth, u => { if (u) setUser(u); else signInAnonymously(auth).catch(() => {}); });
@@ -192,7 +192,7 @@ const TrackerApp = () => {
     if (!db || !user) return;
     const ref = doc(db, 'artifacts', APP_ID, 'users', user.uid, c, id.toString());
     try { if (isDel) await deleteDoc(ref); else await setDoc(ref, data); } 
-    catch(e) { console.warn("Remote sync delayed", e); }
+    catch(e) { console.warn("Sync delayed", e); }
   };
 
   const handleProfileUpdate = (key, val, isString = false) => {
@@ -214,6 +214,15 @@ const TrackerApp = () => {
     return (routines || []).filter(r => r?.days?.includes(dayName));
   }, [routines, selectedDate]);
 
+  // --- Rewards Engine ---
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+  // Triggers "End of Day" if checking a past date, or if it's currently after 7:00 PM local time
+  const isEndOfDay = selectedDate < todayStr || (selectedDate === todayStr && today.getHours() >= 19); 
+  
+  const isGoalCrushed = isEndOfDay && totals.calories > 0 && totals.calories <= safeDailyGoal;
+  const isProteinCrushed = totals.protein > 0 && totals.protein >= (userProfile?.proteinGoal || 150);
+
   // --- Actions ---
   const handleAddItem = (foodItem) => {
     if (isBuilding) {
@@ -224,7 +233,7 @@ const TrackerApp = () => {
     }
     setSearchResults([]);
     setSearchQuery('');
-    setCustomCalories('');
+    setCustomMacros({ calories: '', protein: '', carbs: '', fat: '' });
   };
 
   const handleApplyRoutine = (routine) => {
@@ -256,7 +265,7 @@ const TrackerApp = () => {
         <button onClick={() => { setSearchMode(searchMode === 'ai' ? 'db' : 'ai'); setSearchResults([]); }} className={`pl-5 pr-2 py-4 text-[10px] font-black ${th.text} uppercase tracking-widest`}>
           {searchMode === 'ai' ? '✨ AI' : '🔍 DB'}
         </button>
-        <input placeholder={searchMode === 'db' ? "Search USDA Database..." : "Custom food name..."} className="flex-1 bg-transparent py-4 px-2 text-sm font-medium dark:text-white focus:outline-none" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+        <input ref={searchInputRef} placeholder={searchMode === 'db' ? "Search USDA Database..." : "Custom food name..."} className="flex-1 bg-transparent py-4 px-2 text-sm font-medium dark:text-white focus:outline-none" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
         {isSearching && <Loader2 className={`animate-spin ${th.text} mr-5`} size={20} />}
       </div>
 
@@ -275,12 +284,15 @@ const TrackerApp = () => {
 
           <div className={`p-3 ${th.bgLight} rounded-2xl mt-2 border ${th.border}`}>
              <p className={`text-[10px] font-black ${th.text} uppercase tracking-widest mb-2 px-1 opacity-70`}>Or Add Custom Entry</p>
-             <div className="flex gap-2">
-               <input type="number" placeholder="Calories" value={customCalories} onChange={e => setCustomCalories(e.target.value)} className="w-24 bg-white dark:bg-slate-800 p-3 rounded-xl text-xs font-bold dark:text-white text-center focus:outline-none shadow-sm" />
-               <button onClick={() => { if(searchQuery && customCalories) handleAddItem({ name: searchQuery, calories: Number(customCalories), protein: 0, carbs: 0, fat: 0, portion: '1 custom serving' }); }} className={`flex-1 ${th.bg} text-white font-black text-xs uppercase rounded-xl shadow-md active:scale-95 transition-transform`}>Add Custom</button>
+             <div className="grid grid-cols-4 gap-2 mb-2">
+               <input type="number" placeholder="kcal" value={customMacros.calories} onChange={e => setCustomMacros({...customMacros, calories: e.target.value})} className="w-full bg-white dark:bg-slate-800 p-2 rounded-xl text-[10px] font-bold dark:text-white text-center focus:outline-none shadow-sm" />
+               <input type="number" placeholder="Pro" value={customMacros.protein} onChange={e => setCustomMacros({...customMacros, protein: e.target.value})} className="w-full bg-white dark:bg-slate-800 p-2 rounded-xl text-[10px] font-bold dark:text-white text-center focus:outline-none shadow-sm" />
+               <input type="number" placeholder="Carb" value={customMacros.carbs} onChange={e => setCustomMacros({...customMacros, carbs: e.target.value})} className="w-full bg-white dark:bg-slate-800 p-2 rounded-xl text-[10px] font-bold dark:text-white text-center focus:outline-none shadow-sm" />
+               <input type="number" placeholder="Fat" value={customMacros.fat} onChange={e => setCustomMacros({...customMacros, fat: e.target.value})} className="w-full bg-white dark:bg-slate-800 p-2 rounded-xl text-[10px] font-bold dark:text-white text-center focus:outline-none shadow-sm" />
              </div>
+             <button onClick={() => { if(searchQuery && customMacros.calories) handleAddItem({ name: searchQuery, calories: Number(customMacros.calories), protein: Number(customMacros.protein)||0, carbs: Number(customMacros.carbs)||0, fat: Number(customMacros.fat)||0, portion: '1 custom serving' }); }} className={`w-full py-3 ${th.bg} text-white font-black text-xs uppercase rounded-xl shadow-md active:scale-95 transition-transform`}>Add Custom</button>
           </div>
-          <button onClick={() => { setSearchResults([]); setSearchQuery(''); setCustomCalories(''); }} className="w-full py-3 text-[10px] font-black text-slate-300 uppercase tracking-widest mt-2 hover:text-rose-400 transition-colors">Close Search</button>
+          <button onClick={() => { setSearchResults([]); setSearchQuery(''); setCustomMacros({ calories: '', protein: '', carbs: '', fat: '' }); }} className="w-full py-3 text-[10px] font-black text-slate-300 uppercase tracking-widest mt-2 hover:text-rose-400 transition-colors">Close Search</button>
         </div>
       )}
     </div>
@@ -296,10 +308,10 @@ const TrackerApp = () => {
       >
         <div className={`absolute inset-0 transition-colors duration-1000 ${isDarkMode ? 'bg-black/60' : 'bg-black/20'}`}></div>
 
-        {/* --- GLOBAL HEADER --- */}
+        {/* --- GLOBAL HEADER (Now with Macros) --- */}
         {!isBuilding && (
-          <div className="p-6 pb-12 text-white shrink-0 relative z-10">
-            <div className="flex justify-between items-center mb-8">
+          <div className="p-6 pb-10 text-white shrink-0 relative z-10">
+            <div className="flex justify-between items-center mb-6">
               <button onClick={() => { const d = new Date(selectedDate+'T12:00:00Z'); d.setDate(d.getDate()-1); setSelectedDate(d.toISOString().split('T')[0]); }} className="p-2 hover:bg-white/20 rounded-full backdrop-blur-sm transition-all"><ChevronLeft /></button>
               <button onClick={() => { setIsDatePickerOpen(true); setPickerMonth(new Date(selectedDate + 'T12:00:00Z')); }} className="flex items-center gap-2 group px-4 py-2 hover:bg-white/10 rounded-2xl backdrop-blur-sm transition-all">
                 <h1 className="font-black text-xl tracking-tight drop-shadow-md">{new Date(selectedDate + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' })}</h1>
@@ -308,15 +320,36 @@ const TrackerApp = () => {
               <button onClick={() => { const d = new Date(selectedDate+'T12:00:00Z'); d.setDate(d.getDate()+1); setSelectedDate(d.toISOString().split('T')[0]); }} className="p-2 hover:bg-white/20 rounded-full backdrop-blur-sm transition-all"><ChevronRight /></button>
             </div>
             
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-6 mb-5">
               <div className="bg-white/15 p-6 rounded-[32px] backdrop-blur-xl border border-white/30 text-center min-w-[120px] shadow-2xl">
-                <div className="text-4xl font-black drop-shadow-md">{Math.max(safeDailyGoal - totals.calories, 0)}</div>
-                <div className="text-[10px] uppercase font-bold tracking-[0.2em] opacity-80 mt-1">Remaining</div>
+                <div className="text-4xl font-black drop-shadow-md">{safeDailyGoal - totals.calories}</div>
+                <div className="text-[10px] uppercase font-bold tracking-[0.2em] opacity-80 mt-1">
+                  {safeDailyGoal - totals.calories < 0 ? 'Over Goal' : 'Remaining'}
+                </div>
               </div>
               <div className="flex-1 space-y-2">
                 <div className="flex justify-between items-end drop-shadow-sm"><p className="text-xs font-bold opacity-90 uppercase tracking-widest">Intake: {totals.calories}</p><p className="text-[10px] opacity-80">Goal: {safeDailyGoal}</p></div>
                 <div className="w-full h-2.5 bg-white/20 rounded-full overflow-hidden border border-white/30 shadow-inner"><div className={`h-full ${th.bg} transition-all duration-1000 ease-out`} style={{ width: `${Math.min((totals.calories / safeDailyGoal) * 100, 100)}%` }}></div></div>
               </div>
+            </div>
+
+            {/* Macro Trackers in Header */}
+            <div className="flex justify-between gap-3 px-2">
+              {[
+                { label: 'Pro', val: totals.protein, goal: userProfile?.proteinGoal || 150, color: 'bg-rose-400' },
+                { label: 'Carb', val: totals.carbs, goal: userProfile?.carbsGoal || 250, color: 'bg-emerald-400' },
+                { label: 'Fat', val: totals.fat, goal: userProfile?.fatGoal || 65, color: 'bg-amber-400' }
+              ].map(m => (
+                <div key={m.label} className="flex-1 space-y-1.5">
+                  <div className="flex justify-between text-[9px] font-black uppercase tracking-widest opacity-90 drop-shadow-sm">
+                    <span>{m.label}</span>
+                    <span>{m.val}/{m.goal}</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden shadow-inner">
+                    <div className={`h-full ${m.color} transition-all duration-1000`} style={{ width: `${Math.min((m.val / Math.max(m.goal, 1)) * 100, 100)}%` }}></div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -333,7 +366,7 @@ const TrackerApp = () => {
                   </div>
                </div>
                <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-black text-slate-400">
-                  {['S','M','T','W','T','F','S'].map((d, i) => <div key={i}>{d}</div>)}
+                  {['S','M','T','W','T','F','S'].map((d, i) => <div key={`hdr-${i}`}>{d}</div>)}
                </div>
                <div className="grid grid-cols-7 gap-1.5">
                   {(() => {
@@ -374,7 +407,7 @@ const TrackerApp = () => {
         )}
 
         {/* --- DYNAMIC TAB CONTENT --- */}
-        <div className={`flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar transition-colors duration-1000 relative z-10 rounded-t-[40px] border-t border-white/40 dark:border-slate-700/50 shadow-[0_-10px_40px_rgba(0,0,0,0.2)] ${isDarkMode ? 'bg-slate-950/85 backdrop-blur-2xl' : 'bg-white/85 backdrop-blur-2xl'}`}>
+        <div ref={scrollContainerRef} className={`flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar transition-colors duration-1000 relative z-10 rounded-t-[40px] border-t border-white/40 dark:border-slate-700/50 shadow-[0_-10px_40px_rgba(0,0,0,0.2)] ${isDarkMode ? 'bg-slate-950/85 backdrop-blur-2xl' : 'bg-white/85 backdrop-blur-2xl'}`}>
           
           {isBuilding ? (
             /* BUILDER UI */
@@ -412,8 +445,26 @@ const TrackerApp = () => {
           ) : activeTab === 'log' ? (
             /* DAILY LOG TAB */
             <div className="space-y-6 animate-in fade-in pb-6">
+              
+              {/* Rewards Banner Engine */}
+              {(isGoalCrushed || isProteinCrushed) && (
+                <div className={`p-4 rounded-[24px] border ${isGoalCrushed && isProteinCrushed ? 'bg-indigo-100 border-indigo-300 dark:bg-indigo-900/30' : isGoalCrushed ? 'bg-amber-100 border-amber-300 dark:bg-amber-900/30' : 'bg-emerald-100 border-emerald-300 dark:bg-emerald-900/30'} flex items-center gap-4 shadow-sm animate-in slide-in-from-top-4`}>
+                  <div className={`p-3 rounded-2xl ${isGoalCrushed && isProteinCrushed ? 'bg-indigo-500 shadow-indigo-500/30' : isGoalCrushed ? 'bg-amber-500 shadow-amber-500/30' : 'bg-emerald-500 shadow-emerald-500/30'} text-white shadow-lg`}>
+                    {isGoalCrushed && isProteinCrushed ? <Flame size={20}/> : isGoalCrushed ? <Trophy size={20}/> : <Medal size={20}/>}
+                  </div>
+                  <div>
+                    <p className={`text-[10px] font-black uppercase tracking-widest opacity-70 ${isGoalCrushed && isProteinCrushed ? 'text-indigo-800 dark:text-indigo-400' : isGoalCrushed ? 'text-amber-800 dark:text-amber-400' : 'text-emerald-800 dark:text-emerald-400'}`}>Accomplishment unlocked</p>
+                    <h4 className={`text-sm font-black ${isGoalCrushed && isProteinCrushed ? 'text-indigo-600 dark:text-indigo-500' : isGoalCrushed ? 'text-amber-600 dark:text-amber-500' : 'text-emerald-600 dark:text-emerald-500'}`}>
+                      {isGoalCrushed && isProteinCrushed ? 'Perfect Day: Calories & Protein!' : isGoalCrushed ? 'Calorie Goal Met!' : 'Protein Target Hit!'}
+                    </h4>
+                  </div>
+                </div>
+              )}
+
+              {/* UNIFIED SEARCH MOUNTED IN LOG */}
               {renderSearchEngineUI()}
 
+              {/* Scheduler Suggestion */}
               {todayRoutines.length > 0 && (dailyLog || []).filter(i => i.date === selectedDate).length === 0 && (
                 <div className={`${th.bgLight} p-5 rounded-[32px] border ${th.border} flex items-center justify-between group shadow-sm`}>
                   <div className="flex items-center gap-3">
@@ -425,30 +476,56 @@ const TrackerApp = () => {
               )}
 
               {/* Meal Sections */}
-              {['Breakfast', 'Lunch', 'Dinner', 'Snacks'].map(m => (
-                <div key={m} className="space-y-3">
-                  <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2"><div className={`w-2.5 h-2.5 rounded-full ${th.bg} shadow-md`}></div>{m}</h3>
-                  <div className="space-y-2">
-                    {(dailyLog || []).filter(i => i.date === selectedDate && i.mealType === m).map(item => (
-                      <div key={item.id} className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm p-4 rounded-[32px] flex justify-between items-center shadow-sm border border-white/40 dark:border-slate-700/50 transition-all">
-                        <div className="flex items-center gap-4">
-                          <button onClick={() => updateDB('dailyLog', item.id, { ...item, isEaten: !item.isEaten })} className="transition-transform active:scale-75">
-                            {item.isEaten !== false ? <CheckCircle2 className={th.text} size={24} /> : <Circle className="text-slate-300 dark:text-slate-600" size={24} />}
-                          </button>
-                          <div className={item.isEaten === false ? 'opacity-40 line-through' : ''}>
-                            <p className="text-sm font-bold dark:text-white">{item.name}</p>
-                            <p className="text-[10px] text-slate-500 font-bold uppercase">{item.calories} kcal</p>
+              {['Breakfast', 'Lunch', 'Dinner', 'Snacks'].map(m => {
+                const mealItems = (dailyLog || []).filter(i => i.date === selectedDate && i.mealType === m);
+                const mealCals = mealItems.reduce((s, i) => s + (Number(i.calories) || 0), 0);
+                
+                return (
+                  <div key={m} className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md p-5 rounded-[32px] border border-white/50 dark:border-slate-700/50 shadow-sm space-y-4">
+                    <div className="flex justify-between items-center border-b border-white/30 dark:border-slate-700/50 pb-3">
+                      <h3 className="text-sm font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest flex items-center gap-2">
+                        <div className={`w-2.5 h-2.5 rounded-full ${th.bg} shadow-md`}></div>{m}
+                      </h3>
+                      <span className="text-[11px] font-black text-slate-500 bg-white/50 dark:bg-slate-800/50 px-3 py-1 rounded-xl shadow-inner">{mealCals} kcal</span>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      {mealItems.map(item => (
+                        <div key={item.id} className="bg-white/70 dark:bg-slate-800/70 p-4 rounded-[24px] flex justify-between items-center shadow-sm border border-white/50 dark:border-slate-700/50 transition-all hover:scale-[1.02]">
+                          <div className="flex items-center gap-4">
+                            <button onClick={() => updateDB('dailyLog', item.id, { ...item, isEaten: !item.isEaten })} className="transition-transform active:scale-75">
+                              {item.isEaten !== false ? <CheckCircle2 className={th.text} size={24} /> : <Circle className="text-slate-300 dark:text-slate-600" size={24} />}
+                            </button>
+                            <div className={item.isEaten === false ? 'opacity-40 line-through' : ''}>
+                              <p className="text-sm font-bold dark:text-white">{item.name}</p>
+                              <p className="text-[10px] text-slate-500 font-bold uppercase">{item.calories} kcal</p>
+                            </div>
                           </div>
+                          <button onClick={() => updateDB('dailyLog', item.id, null, true)} className="p-2 text-slate-300 hover:text-rose-400 transition-colors"><Trash2 size={18}/></button>
                         </div>
-                        <button onClick={() => updateDB('dailyLog', item.id, null, true)} className="p-2 text-slate-300 hover:text-rose-400 transition-colors"><Trash2 size={18}/></button>
-                      </div>
-                    ))}
-                    {(dailyLog || []).filter(i => i.date === selectedDate && i.mealType === m).length === 0 && (
-                      <p className="text-[10px] font-bold text-slate-400/70 dark:text-slate-600 uppercase tracking-widest italic py-2 pl-4">Empty</p>
-                    )}
+                      ))}
+                      
+                      {mealItems.length === 0 ? (
+                        <button onClick={() => { 
+                          setMealType(m); 
+                          if (scrollContainerRef.current) scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+                          setTimeout(() => searchInputRef.current?.focus(), 300);
+                        }} className={`w-full py-4 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-2xl text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 hover:${th.bgLight} hover:${th.text} hover:border-transparent transition-all flex items-center justify-center gap-2`}>
+                          <Plus size={14}/> Add {m}
+                        </button>
+                      ) : (
+                        <button onClick={() => { 
+                          setMealType(m); 
+                          if (scrollContainerRef.current) scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+                          setTimeout(() => searchInputRef.current?.focus(), 300);
+                        }} className={`w-full py-2 border-2 border-dashed border-slate-200 dark:border-slate-700/50 rounded-xl text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 hover:${th.bgLight} hover:${th.text} hover:border-transparent transition-all flex items-center justify-center gap-2 opacity-70`}>
+                          <Plus size={12}/> Add Another
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             
           ) : activeTab === 'routines' ? (
@@ -484,9 +561,9 @@ const TrackerApp = () => {
                     </div>
                     <div className="flex gap-2">
                       {isApplied ? (
-                        <button onClick={() => handleRemoveRoutine(r.id)} className="flex-1 py-3 bg-rose-50 text-rose-600 dark:bg-rose-900/30 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-transform active:scale-95"><X size={16}/> Remove</button>
+                        <button onClick={() => handleRemoveRoutine(r.id)} className="flex-1 py-3 bg-rose-50 text-rose-600 dark:bg-rose-900/30 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-transform"><X size={16}/> Remove</button>
                       ) : (
-                        <button onClick={() => handleApplyRoutine(r)} className={`flex-1 py-3 ${th.bgLight} ${th.text} rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-transform active:scale-95`}><CheckCircle2 size={16}/> Apply</button>
+                        <button onClick={() => handleApplyRoutine(r)} className={`flex-1 py-3 ${th.bgLight} ${th.text} rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-transform`}><CheckCircle2 size={16}/> Apply</button>
                       )}
                       <button onClick={() => { setEditingRoutineId(r.id); setBuilderName(r.name || ''); setBuilderItems(r.items || []); setBuilderDays(r.days || []); setSearchQuery(''); setSearchResults([]); setIsBuilding(true); }} className="p-3 bg-white dark:bg-slate-800 rounded-2xl text-slate-400 hover:text-indigo-600 transition-colors shadow-sm"><Pencil size={18}/></button>
                       <button onClick={() => updateDB('routines', r.id, null, true)} className="p-3 bg-white dark:bg-slate-800 rounded-2xl text-slate-400 hover:text-rose-500 transition-colors shadow-sm"><Trash2 size={18}/></button>
@@ -510,7 +587,7 @@ const TrackerApp = () => {
                    </div>
                 </div>
                 <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
-                  {['S','M','T','W','T','F','S'].map((d, i) => <div key={i}>{d}</div>)}
+                  {['S','M','T','W','T','F','S'].map((d, i) => <div key={`hdr-cal-${i}`}>{d}</div>)}
                 </div>
                 <div className="grid grid-cols-7 gap-2.5">
                   {(() => {
