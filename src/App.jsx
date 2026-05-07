@@ -13,7 +13,7 @@ import {
 const APP_ID = 'calorie-tracker-v1';
 
 // AZURE DEPLOYMENT: Replace these strings with your import.meta.env variables before deploying to GitHub
-const USDA_API_KEY = 'DEMO_KEY'; 
+const USDA_API_KEY = 'lkRdpKqn24LgJ3oDTYpLyXyQH7elck6d4GTiOR9Q'; 
 const apiKey = ""; 
 
 // --- Firebase Initialization ---
