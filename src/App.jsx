@@ -17,11 +17,17 @@ const USDA_API_KEY = 'lkRdpKqn24LgJ3oDTYpLyXyQH7elck6d4GTiOR9Q';
 const apiKey = ""; 
 
 // --- Firebase Initialization ---
-let auth = null, db = null;
-try {
-  const cfg = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-  if (cfg) { const app = initializeApp(cfg); auth = getAuth(app); db = getFirestore(app); }
-} catch (e) { console.warn("Firebase Shield Active"); }
+const firebaseConfig = {
+  apiKey: "YOUR_FIREBASE_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app); }
 
 // --- Aesthetic Theme Engine ---
 const COLORS = {
