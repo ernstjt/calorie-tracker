@@ -16,7 +16,7 @@ const APP_ID = 'calorie-tracker-v1';
 const USDA_API_KEY = 'lkRdpKqn24LgJ3oDTYpLyXyQH7elck6d4GTiOR9Q'; 
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBSYiy dcnXeET0JG4TRDNPVoDKRgi5u2vs",
+  apiKey: "AIzaSyBSYiydcnxEeT0JG4TRDNPVoDKRgi5u2vs",
   authDomain: "calorie-tracker-60896.firebaseapp.com",
   projectId: "calorie-tracker-60896",
   storageBucket: "calorie-tracker-60896.firebasestorage.app",
@@ -301,6 +301,13 @@ const TrackerApp = () => {
   return (
     <div className="min-h-screen font-sans flex flex-col items-center bg-slate-900 transition-colors duration-1000">
       
+      {/* Guarantees clean custom scrollbar even if global CSS misses it */}
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.5); border-radius: 10px; }
+      `}</style>
+
       {/* --- AESTHETIC APP CONTAINER --- */}
       <div 
         className="w-full max-w-md h-screen flex flex-col relative overflow-hidden bg-cover bg-center transition-all duration-1000"
@@ -531,7 +538,7 @@ const TrackerApp = () => {
           ) : activeTab === 'routines' ? (
             /* ROUTINES TAB */
             <div className="space-y-4 animate-in fade-in pb-6">
-              <button onClick={() => { setIsBuilding(true); setEditingRoutineId(null); setBuilderName(''); setBuilderItems([]); setSearchQuery(''); setSearchResults([]); setCustomCalories(''); }} className={`w-full py-5 border-2 border-dashed ${th.border} ${th.text} rounded-[32px] font-black tracking-wide text-sm flex items-center justify-center gap-3 hover:${th.bgLight} transition-colors`}>
+              <button onClick={() => { setIsBuilding(true); setEditingRoutineId(null); setBuilderName(''); setBuilderItems([]); setSearchQuery(''); setSearchResults([]); setCustomMacros({ calories: '', protein: '', carbs: '', fat: '' }); }} className={`w-full py-5 border-2 border-dashed ${th.border} ${th.text} rounded-[32px] font-black tracking-wide text-sm flex items-center justify-center gap-3 hover:${th.bgLight} transition-colors`}>
                 <div className="p-1 bg-white dark:bg-slate-800 rounded-lg shadow-sm"><Plus size={18}/></div> Create New Routine
               </button>
               
@@ -626,7 +633,7 @@ const TrackerApp = () => {
 
                     let ringClass = '';
                     if (isSelected) ringClass = `ring-2 ${th.ring} ring-offset-2 dark:ring-offset-slate-900 z-10`;
-                    else if (isToday) ringClass = 'ring-2 ring-emerald-400 dark:ring-emerald-500 ring-offset-2 dark:ring-offset-slate-900 z-10';
+                    else if (isToday) ringClass = 'ring-2 ring-emerald-400 ring-offset-2 dark:ring-offset-slate-900 z-10';
 
                     return (
                       <button key={d.date} onClick={() => setViewingHistoryDetail(d.date)} className={`aspect-square rounded-2xl flex flex-col items-center justify-center transition-all active:scale-90 shadow-sm ${baseBg} ${baseText} ${border} ${ringClass}`}>
