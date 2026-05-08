@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { 
   Search, Plus, Trash2, ChevronRight, ChevronLeft, ChevronDown, X,
   Clock, CalendarDays, ListChecks, CheckCircle2, Circle, Save, Pencil,
   Loader2, Target, Settings, Sparkle, Sun, Moon, AlertCircle, 
-  Scale, Droplets, RefreshCw, Trophy, Medal, Flame
+  Scale, Droplets, RefreshCw, Trophy, Medal, Flame, LogOut
 } from 'lucide-react';
 
 // --- Configuration ---
@@ -44,20 +44,33 @@ const COLORS = {
   blue: { bg: 'bg-blue-500', text: 'text-blue-500', bgLight: 'bg-blue-50', bgDark: 'dark:bg-blue-900/30', ring: 'ring-blue-500', border: 'border-blue-200 dark:border-blue-800/50', shadow: 'shadow-blue-900/20' }
 };
 
+// Rock-solid, verified permanent public domain Unsplash IDs
+const IMAGES = {
+  spring: ['1464822759023-fed622ff2c3b', '1490750967868-88aa4486c946', '1438786107032-f282f1b0a80e', '1520699049698-acd2fce147f2', '1470240731273-7821a6eeb6bc'],
+  summer: ['1507525428034-b723cf961d3e', '1499813292437-0245a49931ce', '1473496169904-712b5043bfb1', '1533371452382-d45a9da51f47', '1501862700950-18382cd204ff'],
+  autumn: ['1476820865390-c52aeebb9891', '1443048997380-04e43e5d038d', '1505322137976-19d2cc8477d8', '1477414348463-c0eb7f1359b6', '1508919801845-a589e47cbaf0'],
+  winter: ['1483664852095-d6cc6870702d', '1450050854492-56455110d7e4', '1478264350174-8b6b2cd64455', '1491002052846-2e52cdd8974a', '1478719059408-592965723cbc'],
+  holiday: ['1512389142860-9c281c678a85', '1518199266791-5375a83190b7', '1508344928928-7137b29de216', '1543363363486-e0e64f7b6d19']
+};
+
 const getThemeForDate = (dateStr) => {
   const d = new Date(dateStr + 'T12:00:00Z');
   const m = d.getMonth() + 1; 
   const day = d.getDate();
+  const year = d.getFullYear();
+  const dailyIndex = year * 366 + m * 31 + day; 
 
-  if (m === 12 && day >= 20) return { img: 'https://images.unsplash.com/photo-1512389142860-9c281c678a85?auto=format&fit=crop&w=800&q=80', color: COLORS.rose };
-  if (m === 10 && day >= 24) return { img: 'https://images.unsplash.com/photo-1508344928928-7137b29de216?auto=format&fit=crop&w=800&q=80', color: COLORS.amber };
-  if (m === 2 && day >= 10 && day <= 14) return { img: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=800&q=80', color: COLORS.rose };
-  if (m === 7 && day >= 1 && day <= 4) return { img: 'https://images.unsplash.com/photo-1531366936336-1e64df2ec2e0?auto=format&fit=crop&w=800&q=80', color: COLORS.blue };
+  const getImgUrl = (arr, index) => `https://images.unsplash.com/photo-${arr[index]}?auto=format&fit=crop&w=800&q=80`;
 
-  if (m >= 3 && m <= 5) return { img: 'https://images.unsplash.com/photo-1490750967868-88aa4486c946?auto=format&fit=crop&w=800&q=80', color: COLORS.emerald };
-  if (m >= 6 && m <= 8) return { img: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80', color: COLORS.sky };
-  if (m >= 9 && m <= 11) return { img: 'https://images.unsplash.com/photo-1476820865390-c52aeebb9891?auto=format&fit=crop&w=800&q=80', color: COLORS.orange };
-  return { img: 'https://images.unsplash.com/photo-1483664852095-d6cc6870702d?auto=format&fit=crop&w=800&q=80', color: COLORS.indigo };
+  if (m === 12 && day >= 20) return { img: getImgUrl(IMAGES.holiday, dailyIndex % IMAGES.holiday.length), fallbackImg: getImgUrl(IMAGES.holiday, 0), color: COLORS.rose };
+  if (m === 10 && day >= 24) return { img: getImgUrl(IMAGES.autumn, dailyIndex % IMAGES.autumn.length), fallbackImg: getImgUrl(IMAGES.autumn, 0), color: COLORS.amber };
+  if (m === 2 && day >= 10 && day <= 14) return { img: getImgUrl(IMAGES.holiday, dailyIndex % IMAGES.holiday.length), fallbackImg: getImgUrl(IMAGES.holiday, 1), color: COLORS.rose };
+  if (m === 7 && day >= 1 && day <= 4) return { img: getImgUrl(IMAGES.summer, dailyIndex % IMAGES.summer.length), fallbackImg: getImgUrl(IMAGES.summer, 0), color: COLORS.blue };
+
+  if (m >= 3 && m <= 5) return { img: getImgUrl(IMAGES.spring, dailyIndex % IMAGES.spring.length), fallbackImg: getImgUrl(IMAGES.spring, 1), color: COLORS.emerald }; // Spring Fallback = Flowers
+  if (m >= 6 && m <= 8) return { img: getImgUrl(IMAGES.summer, dailyIndex % IMAGES.summer.length), fallbackImg: getImgUrl(IMAGES.summer, 0), color: COLORS.sky }; // Summer Fallback = Ocean
+  if (m >= 9 && m <= 11) return { img: getImgUrl(IMAGES.autumn, dailyIndex % IMAGES.autumn.length), fallbackImg: getImgUrl(IMAGES.autumn, 0), color: COLORS.orange }; // Autumn Fallback = Leaves
+  return { img: getImgUrl(IMAGES.winter, dailyIndex % IMAGES.winter.length), fallbackImg: getImgUrl(IMAGES.winter, 0), color: COLORS.indigo }; // Winter Fallback = Snow
 };
 
 // --- Ultimate Error Boundary ---
@@ -103,6 +116,7 @@ const TrackerApp = () => {
   const [viewingHistoryDetail, setViewingHistoryDetail] = useState(null);
   const searchInputRef = useRef(null);
   const scrollContainerRef = useRef(null);
+  const [loginError, setLoginError] = useState('');
 
   // --- SWIPE LOGIC ---
   const touchStart = useRef(null);
@@ -129,6 +143,17 @@ const TrackerApp = () => {
   
   const currentTheme = useMemo(() => getThemeForDate(selectedDate), [selectedDate]);
   const th = currentTheme.color; 
+
+  // --- IMAGE PRE-LOADER & FALLBACK ENGINE ---
+  const [activeBackground, setActiveBackground] = useState(currentTheme.fallbackImg); // Start with safe backup
+  useEffect(() => {
+    let isMounted = true;
+    const img = new window.Image();
+    img.src = currentTheme.img;
+    img.onload = () => { if (isMounted) setActiveBackground(currentTheme.img); };
+    img.onerror = () => { if (isMounted) setActiveBackground(currentTheme.fallbackImg); }; // Swap to beautiful backup!
+    return () => { isMounted = false; };
+  }, [currentTheme.img, currentTheme.fallbackImg]);
   
   const [isDarkMode, setIsDarkMode] = useState(false);
   useEffect(() => {
@@ -158,7 +183,8 @@ const TrackerApp = () => {
     dailyGoal: 2000, proteinGoal: 150, carbsGoal: 250, fatGoal: 65,
     currentWeight: 150, targetWeight: 140, waterGoal: 80, units: 'lbs'
   };
-  const [user, setUser] = useState(null);
+  // Change user default state from null to undefined so we know when Firebase is loading
+  const [user, setUser] = useState(undefined);
   const [dailyLog, setDailyLog] = useState([]);
   const [routines, setRoutines] = useState([]);
   const [userProfile, setUserProfile] = useState(defaultProfile);
@@ -192,8 +218,9 @@ const TrackerApp = () => {
   }, [searchQuery, searchMode]);
 
   useEffect(() => {
-    if (!auth) return;
-    return onAuthStateChanged(auth, u => { if (u) setUser(u); else signInAnonymously(auth).catch(() => {}); });
+    if (!auth) { setUser(null); return; }
+    // Remove the automatic anonymous sign in, and just set the user to whoever is logged in (or null)
+    return onAuthStateChanged(auth, u => { setUser(u); });
   }, []);
 
   useEffect(() => {
@@ -242,6 +269,26 @@ const TrackerApp = () => {
   const isGoalCrushed = isEndOfDay && totals.calories > 0 && totals.calories <= safeDailyGoal;
   const isProteinCrushed = totals.protein > 0 && totals.protein >= (userProfile?.proteinGoal || 150);
 
+  const handleGoogleLogin = async () => {
+    if (!auth) return;
+    setLoginError('');
+    const provider = new GoogleAuthProvider();
+    try { 
+      await signInWithPopup(auth, provider); 
+    } catch (error) { 
+      console.error("Google login error:", error);
+      if (error.code === 'auth/unauthorized-domain') {
+        setLoginError("To use Google Login here, please test locally or deploy to your Azure domain. Otherwise, click 'Continue as Guest' below to try the app!");
+      } else {
+        setLoginError(error.message);
+      }
+    }
+  };
+
+  const handleLogout = () => {
+    if (auth) signOut(auth);
+  };
+
   const handleAddItem = (foodItem) => {
     if (isBuilding) {
       setBuilderItems([...(builderItems || []), { ...foodItem, id: Date.now().toString() + Math.floor(Math.random()*1000), mealType }]);
@@ -278,53 +325,92 @@ const TrackerApp = () => {
 
   const renderSearchEngineUI = () => (
     <div className="space-y-3">
-      <div className={`relative flex items-center rounded-[24px] border-2 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm ${th.border} focus-within:${th.ring} transition-all shadow-sm`}>
+      <div className={`relative flex items-center rounded-[24px] border-2 ${isDarkMode ? 'bg-slate-800/50' : 'bg-white/80'} backdrop-blur-sm ${th.border} focus-within:${th.ring} transition-all shadow-sm`}>
         <button onClick={() => { setSearchMode(searchMode === 'ai' ? 'db' : 'ai'); setSearchResults([]); }} className={`pl-5 pr-2 py-4 text-[10px] font-black ${th.text} uppercase tracking-widest`}>
           {searchMode === 'ai' ? '✨ AI' : '🔍 DB'}
         </button>
-        <input ref={searchInputRef} placeholder={searchMode === 'db' ? "Search USDA Database..." : "Custom food name..."} className="flex-1 bg-transparent py-4 px-2 text-sm font-medium dark:text-white focus:outline-none" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+        <input ref={searchInputRef} placeholder={searchMode === 'db' ? "Search USDA Database..." : "Custom food name..."} className={`flex-1 bg-transparent py-4 px-2 text-sm font-medium ${isDarkMode ? 'text-white' : 'text-slate-800'} focus:outline-none`} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
         {isSearching && <Loader2 className={`animate-spin ${th.text} mr-5`} size={20} />}
       </div>
 
       {(searchResults.length > 0 || (searchQuery.length > 2 && searchMode === 'ai')) && (
-        <div className={`bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-[32px] border ${th.border} p-2 shadow-2xl space-y-1 animate-in slide-in-from-top-4 relative z-20`}>
+        <div className={`${isDarkMode ? 'bg-slate-900/95' : 'bg-white/95'} backdrop-blur-xl rounded-[32px] border ${th.border} p-2 shadow-2xl space-y-1 animate-in slide-in-from-top-4 relative z-20`}>
           <div className="flex gap-1 p-1 mb-2">
              {['Breakfast','Lunch','Dinner','Snacks'].map(m => <button key={m} onClick={() => setMealType(m)} className={`flex-1 py-2 text-[9px] font-black uppercase rounded-xl transition-all ${mealType === m ? `${th.bg} text-white shadow-md` : `text-slate-500 bg-slate-100 dark:bg-slate-800 hover:${th.bgLight}`}`}>{m}</button>)}
           </div>
+          
           {searchResults.map(f => (
             <button key={f.id} onClick={() => handleAddItem(f)} className={`w-full text-left p-4 hover:${th.bgLight} rounded-2xl flex justify-between items-center transition-colors`}>
-              <div className="flex-1 mr-4 overflow-hidden"><p className="text-xs font-bold dark:text-white truncate">{f.name}</p><p className="text-[10px] text-slate-400 font-bold uppercase truncate">{f.brand || 'USDA'}</p></div>
+              <div className="flex-1 mr-4 overflow-hidden"><p className={`text-xs font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'} truncate`}>{f.name}</p><p className="text-[10px] text-slate-400 font-bold uppercase truncate">{f.brand || 'USDA'}</p></div>
               <div className={`text-right ${th.text} font-black text-xs whitespace-nowrap ${th.bgLight} px-3 py-1.5 rounded-xl`}>{f.calories} kcal</div>
             </button>
           ))}
+
           <div className={`p-3 ${th.bgLight} rounded-2xl mt-2 border ${th.border}`}>
              <p className={`text-[10px] font-black ${th.text} uppercase tracking-widest mb-2 px-1 opacity-70`}>Or Add Custom Entry</p>
              <div className="grid grid-cols-4 gap-2 mb-2">
                {['calories', 'protein', 'carbs', 'fat'].map(k => (
-                 <input key={k} type="number" placeholder={k.substring(0,3)} value={customMacros[k]} onChange={e => setCustomMacros({...customMacros, [k]: e.target.value})} className="w-full bg-white dark:bg-slate-800 p-2 rounded-xl text-[10px] font-bold dark:text-white text-center focus:outline-none shadow-sm" />
+                 <input key={k} type="number" placeholder={k.substring(0,3)} value={customMacros[k]} onChange={e => setCustomMacros({...customMacros, [k]: e.target.value})} className={`w-full ${isDarkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-800'} p-2 rounded-xl text-[10px] font-bold text-center focus:outline-none shadow-sm`} />
                ))}
              </div>
              <button onClick={() => { if(searchQuery && customMacros.calories) handleAddItem({ name: searchQuery, calories: Number(customMacros.calories), protein: Number(customMacros.protein)||0, carbs: Number(customMacros.carbs)||0, fat: Number(customMacros.fat)||0, portion: '1 custom serving' }); }} className={`w-full py-3 ${th.bg} text-white font-black text-xs uppercase rounded-xl shadow-md active:scale-95 transition-transform`}>Add Custom</button>
           </div>
-          <button onClick={() => { setSearchResults([]); setSearchQuery(''); setCustomMacros({ calories: '', protein: '', carbs: '', fat: '' }); }} className="w-full py-3 text-[10px] font-black text-slate-300 uppercase tracking-widest mt-2 hover:text-rose-400 transition-colors">Close Search</button>
+          <button onClick={() => { setSearchResults([]); setSearchQuery(''); setCustomMacros({ calories: '', protein: '', carbs: '', fat: '' }); }} className="w-full py-3 text-[10px] font-black text-slate-400 dark:text-slate-300 uppercase tracking-widest mt-2 hover:text-rose-400 transition-colors">Close Search</button>
         </div>
       )}
     </div>
   );
 
+  // Show a loading spinner while Firebase checks if you have a saved session
+  if (user === undefined) {
+    return <div className="min-h-screen bg-slate-900 flex items-center justify-center"><Loader2 className={`animate-spin ${th.text}`} size={48} /></div>;
+  }
+
+  // Show the aesthetic Login Screen if the user is not logged in
+  if (user === null) {
+    return (
+      <div className="min-h-screen font-sans flex flex-col items-center justify-center bg-slate-900 transition-colors duration-1000 relative overflow-hidden">
+        <div className="absolute inset-0 bg-cover bg-center opacity-40 transition-all duration-1000" style={{ backgroundImage: `url(${currentTheme.img})` }}></div>
+        <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-md"></div>
+        
+        <div className="relative z-10 p-8 w-full max-w-md flex flex-col items-center text-center space-y-8 animate-in fade-in zoom-in duration-700">
+           <div className={`w-24 h-24 rounded-[32px] ${th.bg} flex items-center justify-center shadow-2xl shadow-${th.bg}/50 mb-4`}>
+              <Flame size={48} className="text-white" />
+           </div>
+           <div>
+             <h1 className="text-4xl font-black text-white tracking-tight mb-2">Tracker</h1>
+             <p className="text-slate-400 font-bold tracking-widest text-xs uppercase">Your Personal Nutrition Hub</p>
+           </div>
+           
+           <div className="w-full space-y-4 pt-8">
+             {loginError && (
+               <div className="p-4 rounded-2xl bg-rose-500/20 border border-rose-500/50 text-rose-200 text-xs font-bold leading-relaxed mb-4 text-center">
+                 {loginError}
+               </div>
+             )}
+             <button onClick={handleGoogleLogin} className="w-full py-4 bg-white text-slate-900 rounded-3xl font-black text-sm flex items-center justify-center gap-3 shadow-xl hover:bg-slate-50 transition-transform active:scale-95">
+               <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" /><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" /><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" /><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" /></svg>
+               Sign in with Google
+             </button>
+             
+             <button onClick={() => { setLoginError(''); signInAnonymously(auth); }} className="w-full py-4 bg-white/10 text-white rounded-3xl font-black text-sm flex items-center justify-center gap-3 border border-white/20 hover:bg-white/20 transition-transform active:scale-95">
+               Continue as Guest
+             </button>
+           </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen font-sans flex flex-col items-center bg-slate-900 transition-colors duration-1000">
-      <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.5); border-radius: 10px; }
-      `}</style>
+    <div className={`min-h-screen font-sans flex flex-col items-center transition-colors duration-1000 ${isDarkMode ? 'bg-slate-900' : 'bg-slate-50'}`}>
       
+      {/* THE FALLBACK ENGINE is now actively powering this div */}
       <div 
-        className="w-full max-w-md h-screen flex flex-col relative overflow-hidden bg-cover bg-center transition-all duration-1000"
-        style={{ backgroundImage: `url(${currentTheme.img})` }}
+        className={`w-full max-w-md h-screen flex flex-col relative overflow-hidden bg-cover bg-center transition-all duration-1000 bg-slate-900`}
+        style={{ backgroundImage: `url('${activeBackground}')` }}
       >
-        <div className={`absolute inset-0 transition-colors duration-1000 ${isDarkMode ? 'bg-black/60' : 'bg-black/20'}`}></div>
+        <div className={`absolute inset-0 transition-colors duration-1000 ${isDarkMode ? 'bg-black/60' : 'bg-black/25'}`}></div>
 
         {/* --- GLOBAL HEADER --- */}
         {!isBuilding && (
@@ -372,12 +458,12 @@ const TrackerApp = () => {
         {/* --- GLOBAL DATE PICKER --- */}
         {isDatePickerOpen && (
           <div className="absolute inset-0 z-[60] bg-slate-950/60 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
-            <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl w-full rounded-[40px] shadow-2xl p-6 space-y-4 border border-white/20 dark:border-slate-700/50">
+            <div className={`${isDarkMode ? 'bg-slate-900/95' : 'bg-white/95'} backdrop-blur-xl w-full rounded-[40px] shadow-2xl p-6 space-y-4 border ${isDarkMode ? 'border-slate-700/50' : 'border-white/20'}`}>
                <div className="flex justify-between items-center px-2">
-                  <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest">{pickerMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h3>
+                  <h3 className={`font-black uppercase tracking-widest ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{pickerMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h3>
                   <div className="flex gap-1">
-                    <button onClick={() => setPickerMonth(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth()-1, 1))} className="p-2 dark:text-white"><ChevronLeft/></button>
-                    <button onClick={() => setPickerMonth(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth()+1, 1))} className="p-2 dark:text-white"><ChevronRight/></button>
+                    <button onClick={() => setPickerMonth(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth()-1, 1))} className={`p-2 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}><ChevronLeft/></button>
+                    <button onClick={() => setPickerMonth(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth()+1, 1))} className={`p-2 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}><ChevronRight/></button>
                   </div>
                </div>
                <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-black text-slate-400">
@@ -392,10 +478,17 @@ const TrackerApp = () => {
                   })().map((d, i) => {
                     if (!d) return <div key={`empty-${i}`}></div>;
                     const isSelected = selectedDate === d.date;
-                    return <button key={d.date} onClick={() => { setSelectedDate(d.date); setIsDatePickerOpen(false); }} className={`aspect-square rounded-xl text-xs font-black transition-all ${isSelected ? `${th.bg} text-white` : 'bg-slate-100 dark:bg-slate-800 dark:text-white'}`}>{d.day}</button>;
+                    const isToday = d.date === new Date().toISOString().split('T')[0];
+                    
+                    let btnClasses = 'aspect-square rounded-xl text-xs font-black transition-all ';
+                    if (isSelected) btnClasses += `${th.bg} text-white shadow-lg `;
+                    else btnClasses += `${isDarkMode ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-800'} hover:bg-slate-200 dark:hover:bg-slate-700 `;
+                    if (isToday && !isSelected) btnClasses += `ring-2 ${th.ring} ring-offset-2 ${isDarkMode ? 'dark:ring-offset-slate-900' : 'ring-offset-white'} `;
+
+                    return <button key={d.date} onClick={() => { setSelectedDate(d.date); setIsDatePickerOpen(false); }} className={btnClasses}>{d.day}</button>;
                   })}
                </div>
-               <button onClick={() => setIsDatePickerOpen(false)} className="w-full py-4 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-black text-xs uppercase transition-colors">Cancel</button>
+               <button onClick={() => setIsDatePickerOpen(false)} className={`w-full py-4 ${isDarkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-200 text-slate-600'} rounded-2xl font-black text-xs uppercase transition-colors`}>Cancel</button>
             </div>
           </div>
         )}
@@ -404,15 +497,15 @@ const TrackerApp = () => {
         <div 
           onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
           ref={scrollContainerRef} 
-          className={`flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar transition-colors duration-1000 relative z-10 rounded-t-[40px] border-t border-white/40 dark:border-slate-700/50 shadow-[0_-10px_40px_rgba(0,0,0,0.2)] ${isDarkMode ? 'bg-slate-950/85 backdrop-blur-2xl' : 'bg-white/85 backdrop-blur-2xl'}`}
+          className={`flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar transition-colors duration-1000 relative z-10 rounded-t-[40px] border-t border-white/40 shadow-[0_-10px_40px_rgba(0,0,0,0.2)] ${isDarkMode ? 'bg-slate-950/85 backdrop-blur-2xl dark:border-slate-700/50' : 'bg-white/95 backdrop-blur-2xl'}`}
         >
           {isBuilding ? (
             <div className="space-y-6 animate-in slide-in-from-bottom-4 pb-10">
-              <div className="flex justify-between items-center"><h2 className="text-2xl font-black dark:text-white">Routine Builder</h2><button onClick={() => setIsBuilding(false)} className="p-2 bg-slate-200/50 dark:bg-slate-800/50 rounded-full text-slate-500 hover:text-rose-500 transition-colors"><X size={20}/></button></div>
-              <input placeholder="Name Your Routine..." className="w-full p-5 rounded-3xl bg-white/60 dark:bg-slate-900/60 dark:text-white font-black text-lg border border-white/20 dark:border-slate-700/50 focus:outline-none" value={builderName} onChange={e => setBuilderName(e.target.value)} />
+              <div className="flex justify-between items-center"><h2 className={`text-2xl font-black ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Routine Builder</h2><button onClick={() => setIsBuilding(false)} className={`p-2 rounded-full text-slate-500 hover:text-rose-500 transition-colors ${isDarkMode ? 'bg-slate-800/50' : 'bg-slate-200/50'}`}><X size={20}/></button></div>
+              <input placeholder="Name Your Routine..." className={`w-full p-5 rounded-3xl font-black text-lg focus:outline-none border ${isDarkMode ? 'bg-slate-900/60 text-white border-slate-700/50' : 'bg-white text-slate-800 border-slate-200 shadow-sm'}`} value={builderName} onChange={e => setBuilderName(e.target.value)} />
               <div className="space-y-3">
                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-2">Repeat Weekly On</p>
-                <div className="flex justify-between gap-1 bg-white/50 dark:bg-slate-900/50 p-1.5 rounded-[24px] border border-white/20 dark:border-slate-700/50">
+                <div className={`flex justify-between gap-1 p-1.5 rounded-[24px] border ${isDarkMode ? 'bg-slate-900/50 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
                   {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day => (
                     <button key={day} onClick={() => setBuilderDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day])} className={`flex-1 py-3 text-[10px] font-black rounded-xl transition-all ${builderDays.includes(day) ? `${th.bg} text-white shadow-md` : 'text-slate-500'}`}>{day}</button>
                   ))}
@@ -421,13 +514,13 @@ const TrackerApp = () => {
               {renderSearchEngineUI()}
               <div className="space-y-2">
                 {(builderItems || []).map(item => (
-                  <div key={item.id} className="flex justify-between items-center p-4 bg-white/60 dark:bg-slate-900/60 rounded-3xl border border-white/20 dark:border-slate-700/50">
-                    <div><p className="text-sm font-bold dark:text-white">{item.name}</p><p className={`text-[10px] ${th.text} font-bold uppercase tracking-widest`}>{item.mealType} • {item.calories} kcal</p></div>
+                  <div key={item.id} className={`flex justify-between items-center p-4 rounded-3xl border ${isDarkMode ? 'bg-slate-900/60 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
+                    <div><p className={`text-sm font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{item.name}</p><p className={`text-[10px] ${th.text} font-bold uppercase tracking-widest`}>{item.mealType} • {item.calories} kcal</p></div>
                     <button onClick={() => setBuilderItems(builderItems.filter(i => i.id !== item.id))} className="p-2 text-slate-400 hover:text-rose-500 transition-colors"><X size={18}/></button>
                   </div>
                 ))}
               </div>
-              <button onClick={saveRoutine} className={`w-full py-5 ${th.bg} text-white rounded-3xl font-black text-lg shadow-xl flex items-center justify-center gap-3 transition-transform active:scale-95`}><Save /> Save Routine</button>
+              <button onClick={saveRoutine} className={`w-full py-5 ${th.bg} text-white rounded-3xl font-black text-lg shadow-xl ${th.shadow} flex items-center justify-center gap-3 transition-transform active:scale-95`}><Save /> Save Routine</button>
             </div>
           ) : activeTab === 'log' ? (
             <div className="space-y-6 animate-in fade-in pb-6">
@@ -446,27 +539,27 @@ const TrackerApp = () => {
               {['Breakfast', 'Lunch', 'Dinner', 'Snacks'].map(m => {
                 const mealItems = (dailyLog || []).filter(i => i.date === selectedDate && i.mealType === m);
                 return (
-                  <div key={m} className="space-y-4">
-                    <div className="flex justify-between items-center border-b border-white/30 dark:border-slate-700/50 pb-2 mx-1">
-                      <h3 className="text-xs font-black text-slate-500 uppercase flex items-center gap-2 tracking-widest"><div className={`w-2.5 h-2.5 rounded-full ${th.bg}`}></div>{m}</h3>
-                      <span className="text-[10px] font-black text-slate-400">{mealItems.reduce((s,i)=>s+(Number(i.calories)||0),0)} kcal</span>
+                  <div key={m} className={`p-5 rounded-[32px] shadow-sm space-y-4 border ${isDarkMode ? 'bg-slate-900/40 border-slate-700/50' : 'bg-white/80 border-slate-200'}`}>
+                    <div className={`flex justify-between items-center border-b pb-3 mx-1 ${isDarkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
+                      <h3 className={`text-sm font-black uppercase tracking-widest flex items-center gap-2 ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}><div className={`w-2.5 h-2.5 rounded-full ${th.bg} shadow-md`}></div>{m}</h3>
+                      <span className={`text-[11px] font-black px-3 py-1 rounded-xl shadow-inner ${isDarkMode ? 'text-slate-400 bg-slate-800/50' : 'text-slate-600 bg-slate-100'}`}>{mealItems.reduce((s,i)=>s+(Number(i.calories)||0),0)} kcal</span>
                     </div>
                     <div className="space-y-2">
                       {mealItems.map(item => (
-                        <div key={item.id} className="bg-white/70 dark:bg-slate-900/60 p-4 rounded-[28px] flex justify-between items-center shadow-sm border border-white/50 dark:border-slate-700/50 transition-all active:scale-[0.98]">
+                        <div key={item.id} className={`p-4 rounded-[24px] flex justify-between items-center shadow-sm border transition-all active:scale-[0.98] ${isDarkMode ? 'bg-slate-800/70 border-slate-700/50' : 'bg-white border-slate-100'}`}>
                           <div className="flex items-center gap-4">
                             <button onClick={() => updateDB('dailyLog', item.id, { ...item, isEaten: !item.isEaten })} className="transition-transform active:scale-75">
-                              {item.isEaten !== false ? <CheckCircle2 className={th.text} size={24} /> : <Circle className="text-slate-300 dark:text-slate-600" size={24} />}
+                              {item.isEaten !== false ? <CheckCircle2 className={th.text} size={24} /> : <Circle className={`text-slate-300 ${isDarkMode ? 'dark:text-slate-600' : ''}`} size={24} />}
                             </button>
                             <div className={item.isEaten === false ? 'opacity-40 line-through' : ''}>
-                              <p className="text-sm font-bold dark:text-white leading-tight">{item.name}</p>
+                              <p className={`text-sm font-bold leading-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{item.name}</p>
                               <p className="text-[10px] text-slate-500 font-bold uppercase">{item.calories} kcal</p>
                             </div>
                           </div>
                           <button onClick={() => updateDB('dailyLog', item.id, null, true)} className="p-2 text-slate-300 hover:text-rose-400 transition-colors"><Trash2 size={18}/></button>
                         </div>
                       ))}
-                      <button onClick={() => { setMealType(m); searchInputRef.current?.focus(); }} className={`w-full py-4 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-3xl text-[10px] font-black uppercase text-slate-400 hover:${th.bgLight} transition-all flex items-center justify-center gap-2`}>
+                      <button onClick={() => { setMealType(m); searchInputRef.current?.focus(); }} className={`w-full py-4 border-2 border-dashed rounded-3xl text-[10px] font-black uppercase text-slate-400 hover:${th.bgLight} transition-all flex items-center justify-center gap-2 ${isDarkMode ? 'border-slate-600' : 'border-slate-300 hover:text-slate-700'}`}>
                         <Plus size={14}/> Add to {m}
                       </button>
                     </div>
@@ -477,18 +570,18 @@ const TrackerApp = () => {
           ) : activeTab === 'routines' ? (
             <div className="space-y-4 animate-in fade-in pb-6">
               <button onClick={() => { setIsBuilding(true); setEditingRoutineId(null); setBuilderName(''); setBuilderItems([]); setSearchQuery(''); setSearchResults([]); setCustomMacros({calories:'',protein:'',carbs:'',fat:''}); }} className={`w-full py-5 border-2 border-dashed ${th.border} ${th.text} rounded-[32px] font-black tracking-wide text-sm flex items-center justify-center gap-3 hover:${th.bgLight} transition-colors`}>
-                <div className="p-1 bg-white dark:bg-slate-800 rounded-lg shadow-sm"><Plus size={18}/></div> Create New Routine
+                <div className={`p-1 rounded-lg shadow-sm ${isDarkMode ? 'bg-slate-800' : 'bg-white'}`}><Plus size={18}/></div> Create New Routine
               </button>
               {(routines || []).map(r => {
                 const isApplied = (dailyLog || []).some(log => log.date === selectedDate && log.routineId === r.id);
                 return (
-                  <div key={r.id} className="p-6 bg-white/60 dark:bg-slate-900/60 rounded-[40px] border border-white/40 dark:border-slate-700/50 shadow-sm space-y-4">
-                    <h4 className="font-black text-lg dark:text-white">{r.name || 'Untitled'}</h4>
+                  <div key={r.id} className={`p-6 rounded-[40px] border shadow-sm space-y-4 ${isDarkMode ? 'bg-slate-900/60 border-slate-700/50' : 'bg-white/80 border-slate-200'}`}>
+                    <h4 className={`font-black text-lg ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{r.name || 'Untitled'}</h4>
                     <div className="flex gap-2">
                       <button onClick={() => isApplied ? handleRemoveRoutine(r.id) : handleApplyRoutine(r)} className={`flex-1 py-3 ${isApplied ? 'bg-rose-50 text-rose-600' : th.bgLight + ' ' + th.text} rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-2`}>
                         {isApplied ? <X size={16}/> : <CheckCircle2 size={16}/>} {isApplied ? 'Remove' : 'Apply'}
                       </button>
-                      <button onClick={() => updateDB('routines', r.id, null, true)} className="p-3 bg-white dark:bg-slate-800 rounded-2xl text-slate-400 hover:text-rose-500 transition-colors shadow-sm"><Trash2 size={18}/></button>
+                      <button onClick={() => updateDB('routines', r.id, null, true)} className={`p-3 rounded-2xl text-slate-400 hover:text-rose-500 transition-colors shadow-sm ${isDarkMode ? 'bg-slate-800' : 'bg-white'}`}><Trash2 size={18}/></button>
                     </div>
                   </div>
                 );
@@ -496,9 +589,9 @@ const TrackerApp = () => {
             </div>
           ) : activeTab === 'plan' ? (
             <div className="space-y-6 animate-in fade-in pb-6">
-              <div className="flex items-center gap-3"><CalendarDays className={th.text} size={24} /><h3 className="font-black text-xl dark:text-white tracking-tight">Activity Log</h3></div>
-              <div className="bg-white/60 dark:bg-slate-900/60 p-5 rounded-[40px] border border-white/40 dark:border-slate-700/50 shadow-sm">
-                <h3 className="font-black text-sm uppercase tracking-widest text-slate-600 dark:text-slate-300 mb-4">{calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h3>
+              <div className="flex items-center gap-3"><CalendarDays className={th.text} size={24} /><h3 className={`font-black text-xl tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Activity Log</h3></div>
+              <div className={`p-5 rounded-[40px] border shadow-sm ${isDarkMode ? 'bg-slate-900/60 border-slate-700/50' : 'bg-white/80 border-slate-200'}`}>
+                <h3 className="font-black text-sm uppercase tracking-widest text-slate-500 mb-4">{calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h3>
                 <div className="grid grid-cols-7 gap-2.5">
                   {(() => {
                     const days = [], first = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1).getDay(), total = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth()+1, 0).getDate();
@@ -511,58 +604,110 @@ const TrackerApp = () => {
                     return days;
                   })().map((d, i) => {
                     if (!d) return <div key={i}></div>;
+                    const isSelected = viewingHistoryDetail === d.date;
+                    const isToday = d.date === new Date().toISOString().split('T')[0];
                     const hasData = d.total > 0;
-                    return <button key={d.date} onClick={() => setViewingHistoryDetail(d.date)} className={`aspect-square rounded-2xl flex items-center justify-center transition-all ${hasData ? th.bgLight + ' ' + th.text : 'bg-slate-100 dark:bg-slate-800 dark:text-slate-500'}`}><span className="text-[12px] font-black">{d.day}</span></button>;
+                    const isOver = d.total > safeDailyGoal;
+
+                    let baseBg = 'bg-white/50 dark:bg-slate-800/30';
+                    let baseText = 'text-slate-500 dark:text-white';
+                    let border = 'border border-transparent dark:border-slate-700/50';
+
+                    if (hasData) {
+                      if (isOver) {
+                        baseBg = 'bg-rose-100 dark:bg-rose-500/30';
+                        baseText = 'text-rose-600 dark:text-white';
+                        border = 'border border-rose-200 dark:border-rose-400/50';
+                      } else {
+                        baseBg = `${th.bgLight}`;
+                        baseText = `${th.text} dark:text-white`;
+                        border = `border ${th.border}`;
+                      }
+                    }
+
+                    let ringClass = '';
+                    if (isSelected) ringClass = `ring-2 ${th.ring} ring-offset-2 dark:ring-offset-slate-900 z-10`;
+                    else if (isToday) ringClass = `ring-2 ring-emerald-400 dark:ring-emerald-500 ring-offset-2 dark:ring-offset-slate-900 z-10`;
+
+                    return (
+                      <button key={d.date} onClick={() => setViewingHistoryDetail(d.date)} className={`aspect-square rounded-2xl flex items-center justify-center transition-all active:scale-90 shadow-sm ${baseBg} ${baseText} ${border} ${ringClass}`}>
+                        <span className="text-[12px] font-black">{d.day}</span>
+                      </button>
+                    );
                   })}
                 </div>
               </div>
+
+              {/* History Detail Overlay */}
+              {viewingHistoryDetail && (
+                <div className={`p-6 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-2 ${th.border} rounded-[40px] animate-in slide-in-from-top-4 shadow-xl`}>
+                   <div className="flex justify-between items-center border-b border-slate-200/50 dark:border-slate-700/50 pb-4 mb-4">
+                     <h4 className="font-black text-xs uppercase tracking-[0.2em] dark:text-white">{new Date(viewingHistoryDetail + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' })}</h4>
+                     <button onClick={() => setViewingHistoryDetail(null)} className="p-2 bg-white dark:bg-slate-800 rounded-full shadow-sm"><X size={16}/></button>
+                   </div>
+                   <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-2">
+                     {(dailyLog || []).filter(l => l.date === viewingHistoryDetail).map(item => (
+                       <div key={item.id} className="flex justify-between items-center p-4 bg-white/90 dark:bg-slate-800/90 rounded-[24px] shadow-sm border border-slate-100 dark:border-slate-700/50">
+                         <span className="text-xs font-bold dark:text-white truncate mr-4">{item.name}</span>
+                         <span className={`text-xs font-black ${th.text} whitespace-nowrap`}>{item.calories} kcal</span>
+                       </div>
+                     ))}
+                     {(dailyLog || []).filter(l => l.date === viewingHistoryDetail).length === 0 && <p className="text-center text-[10px] text-slate-400 font-bold uppercase tracking-widest py-6">No food logged</p>}
+                   </div>
+                </div>
+              )}
             </div>
+            
           ) : (
             <div className="space-y-6 animate-in fade-in pb-6">
-               <div className="flex items-center gap-3"><Settings className={th.text} size={24} /><h3 className="font-black text-xl dark:text-white tracking-tight">Settings</h3></div>
+               <div className="flex items-center gap-3"><Settings className={th.text} size={24} /><h3 className={`font-black text-xl tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Settings</h3></div>
                
-               <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm p-6 rounded-[32px] border border-white/40 dark:border-slate-700/50 space-y-6">
+               <div className={`p-6 rounded-[32px] border space-y-6 shadow-sm ${isDarkMode ? 'bg-slate-900/60 border-slate-700/50' : 'bg-white/80 border-slate-200'}`}>
                   <h4 className="text-xs font-black uppercase text-slate-500 flex items-center gap-2"><Target size={14}/> Nutrition Targets</h4>
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400 block text-center">Daily Calories</label>
-                    <SafeInput type="number" className="w-full p-4 bg-white dark:bg-slate-800 rounded-2xl dark:text-white font-black text-2xl text-center border border-slate-100 dark:border-slate-700" value={userProfile?.dailyGoal} onChange={v => handleProfileUpdate('dailyGoal', v)} />
+                    <SafeInput type="number" className={`w-full p-4 rounded-2xl font-black text-2xl text-center border focus:ring-2 ${th.ring} ${isDarkMode ? 'bg-slate-800 text-white border-slate-700' : 'bg-white text-slate-800 border-slate-200 shadow-sm'}`} value={userProfile?.dailyGoal ?? 2000} onChange={v => handleProfileUpdate('dailyGoal', v)} />
                   </div>
                   <div className="grid grid-cols-3 gap-3">
                     {[
-                      { l: 'Pro', k: 'proteinGoal', c: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-900/20' },
-                      { l: 'Carb', k: 'carbsGoal', c: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
-                      { l: 'Fat', k: 'fatGoal', c: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20' }
+                      { l: 'Pro', k: 'proteinGoal', c: 'text-rose-500', bg: isDarkMode ? 'bg-rose-900/20' : 'bg-rose-50' },
+                      { l: 'Carb', k: 'carbsGoal', c: 'text-emerald-500', bg: isDarkMode ? 'bg-emerald-900/20' : 'bg-emerald-50' },
+                      { l: 'Fat', k: 'fatGoal', c: 'text-amber-500', bg: isDarkMode ? 'bg-amber-900/20' : 'bg-amber-50' }
                     ].map(g => (
                       <div key={g.k} className="space-y-1">
                         <label className={`text-[9px] font-black uppercase text-center block ${g.c}`}>{g.l}</label>
-                        <SafeInput type="number" className={`w-full p-3 ${g.bg} rounded-xl dark:text-white font-black text-center border border-white/50`} value={userProfile?.[g.k]} onChange={v => handleProfileUpdate(g.k, v)} />
+                        <SafeInput type="number" className={`w-full p-3 ${g.bg} rounded-xl font-black text-center border ${isDarkMode ? 'border-transparent text-white' : 'border-slate-100 text-slate-800 shadow-sm'}`} value={userProfile?.[g.k]} onChange={v => handleProfileUpdate(g.k, v)} />
                       </div>
                     ))}
                   </div>
                </div>
 
-               <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm p-6 rounded-[32px] border border-white/40 dark:border-slate-700/50 space-y-6">
-                  <div className="flex justify-between items-center"><h4 className="text-xs font-black uppercase text-slate-500 flex items-center gap-2"><Scale size={14}/> Body Metrics</h4><button onClick={() => handleProfileUpdate('units', userProfile?.units === 'kg' ? 'lbs' : 'kg', true)} className="text-[9px] font-black text-indigo-500 px-2 py-1 bg-indigo-50 rounded-lg">{userProfile?.units || 'lbs'}</button></div>
+               <div className={`p-6 rounded-[32px] border space-y-6 shadow-sm ${isDarkMode ? 'bg-slate-900/60 border-slate-700/50' : 'bg-white/80 border-slate-200'}`}>
+                  <div className="flex justify-between items-center"><h4 className="text-xs font-black uppercase text-slate-500 flex items-center gap-2"><Scale size={14}/> Body Metrics</h4><button onClick={() => handleProfileUpdate('units', userProfile?.units === 'kg' ? 'lbs' : 'kg', true)} className="text-[9px] font-black text-indigo-500 px-2 py-1 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">{userProfile?.units || 'lbs'}</button></div>
                   <div className="grid grid-cols-2 gap-3">
-                     <div className="space-y-1"><label className="text-[9px] font-black uppercase text-slate-400 block text-center">Current</label><SafeInput type="number" className="w-full p-3 bg-white dark:bg-slate-800 rounded-xl dark:text-white font-black text-center" value={userProfile?.currentWeight} onChange={v => handleProfileUpdate('currentWeight', v)} /></div>
-                     <div className="space-y-1"><label className={`text-[9px] font-black uppercase ${th.text} block text-center`}>Goal</label><SafeInput type="number" className={`w-full p-3 ${th.bgLight} rounded-xl dark:text-white font-black text-center`} value={userProfile?.targetWeight} onChange={v => handleProfileUpdate('targetWeight', v)} /></div>
+                     <div className="space-y-1"><label className="text-[9px] font-black uppercase text-slate-400 block text-center">Current</label><SafeInput type="number" className={`w-full p-3 rounded-xl font-black text-center shadow-sm ${isDarkMode ? 'bg-slate-800 text-white border-transparent' : 'bg-white text-slate-800 border border-slate-200'}`} value={userProfile?.currentWeight} onChange={v => handleProfileUpdate('currentWeight', v)} /></div>
+                     <div className="space-y-1"><label className={`text-[9px] font-black uppercase ${th.text} block text-center`}>Goal</label><SafeInput type="number" className={`w-full p-3 ${th.bgLight} rounded-xl font-black text-center shadow-sm ${isDarkMode ? 'text-white border-transparent' : 'text-slate-800 border border-slate-100'}`} value={userProfile?.targetWeight} onChange={v => handleProfileUpdate('targetWeight', v)} /></div>
                   </div>
-                  <div className="pt-4 border-t border-white/30 dark:border-slate-700/50">
+                  <div className={`pt-4 border-t ${isDarkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
                     <label className="text-[10px] font-black uppercase text-slate-400 mb-2 flex items-center gap-2 justify-center"><Droplets size={12} className="text-blue-500"/> Daily Water (oz)</label>
-                    <SafeInput type="number" className="w-full p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl dark:text-white font-black text-xl text-center" value={userProfile?.waterGoal} onChange={v => handleProfileUpdate('waterGoal', v)} />
+                    <SafeInput type="number" className={`w-full p-4 rounded-2xl font-black text-xl text-center shadow-sm ${isDarkMode ? 'bg-blue-900/20 text-white border-transparent' : 'bg-blue-50 text-slate-800 border border-blue-100'}`} value={userProfile?.waterGoal} onChange={v => handleProfileUpdate('waterGoal', v)} />
                   </div>
                </div>
 
-               <button onClick={toggleTheme} className="w-full py-4 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center gap-3 font-bold text-slate-600 dark:text-slate-300 shadow-sm border border-slate-100 dark:border-slate-700">
+               <button onClick={toggleTheme} className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 font-bold shadow-sm border transition-transform active:scale-95 ${isDarkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-white text-slate-600 border-slate-200'}`}>
                   {isDarkMode ? <Sun size={18} className="text-amber-500" /> : <Moon size={18} className={th.text} />}
                   {isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+               </button>
+
+               <button onClick={handleLogout} className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 font-bold shadow-sm border transition-transform active:scale-95 text-rose-500 ${isDarkMode ? 'bg-rose-900/20 border-rose-900/50' : 'bg-rose-50 border-rose-100'}`}>
+                  <LogOut size={18} /> Sign Out
                </button>
             </div>
           )}
         </div>
 
         {!isBuilding && (
-          <div className={`shrink-0 border-t border-white/40 dark:border-slate-700/50 flex justify-around py-5 pb-9 sm:pb-5 transition-all relative z-20 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] ${isDarkMode ? 'bg-slate-950/85 backdrop-blur-2xl' : 'bg-white/85 backdrop-blur-2xl'}`}>
+          <div className={`shrink-0 border-t flex justify-around py-5 pb-9 sm:pb-5 transition-all relative z-20 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] ${isDarkMode ? 'bg-slate-950/85 backdrop-blur-2xl border-slate-700/50' : 'bg-white/95 backdrop-blur-2xl border-white/40'}`}>
             {['log', 'routines', 'plan', 'settings'].map((t, idx) => {
               const Icons = [Clock, ListChecks, CalendarDays, Settings];
               const Icon = Icons[idx];
