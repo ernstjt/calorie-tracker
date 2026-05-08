@@ -6,12 +6,13 @@ import {
   Search, Plus, Trash2, ChevronRight, ChevronLeft, ChevronDown, X,
   Clock, CalendarDays, ListChecks, CheckCircle2, Circle, Save, Pencil,
   Loader2, Target, Settings, Sparkle, Sun, Moon, AlertCircle, 
-  Scale, Droplets, RefreshCw, Trophy, Medal, Flame, LogOut
+  Scale, Droplets, RefreshCw, Trophy, Medal, Flame, LogOut, TrendingUp
 } from 'lucide-react';
 
 // --- Configuration ---
 const APP_ID = 'calorie-tracker-v1';
 const USDA_API_KEY = 'lkRdpKqn24LgJ3oDTYpLyXyQH7elck6d4GTiOR9Q'; 
+const apiKey = ""; // Gemini API Key injected by environment
 
 const firebaseConfig = {
   apiKey: "AIzaSyBSYiydcnxEeT0JG4TRDNPVoDKRgi5u2vs",
@@ -46,11 +47,11 @@ const COLORS = {
 
 // Rock-solid, verified permanent public domain Unsplash IDs
 const IMAGES = {
-  spring: ['1464822759023-fed622ff2c3b', '1490750967868-88aa4486c946', '1438786107032-f282f1b0a80e', '1520699049698-acd2fce147f2', '1470240731273-7821a6eeb6bc'],
-  summer: ['1507525428034-b723cf961d3e', '1499813292437-0245a49931ce', '1473496169904-712b5043bfb1', '1533371452382-d45a9da51f47', '1501862700950-18382cd204ff'],
-  autumn: ['1476820865390-c52aeebb9891', '1443048997380-04e43e5d038d', '1505322137976-19d2cc8477d8', '1477414348463-c0eb7f1359b6', '1508919801845-a589e47cbaf0'],
-  winter: ['1483664852095-d6cc6870702d', '1450050854492-56455110d7e4', '1478264350174-8b6b2cd64455', '1491002052846-2e52cdd8974a', '1478719059408-592965723cbc'],
-  holiday: ['1512389142860-9c281c678a85', '1518199266791-5375a83190b7', '1508344928928-7137b29de216', '1543363363486-e0e64f7b6d19']
+  spring: ['1464822759023-fed622ff2c3b', '1490750967868-88aa4486c946', '1438786107032-f282f1b0a80e', '1520699049698-acd2fce147f2', '1470240731273-7821a6eeb6bc', '1550159930-40066082a4fc', '1491147334706-e7bc53c6e4e5'],
+  summer: ['1507525428034-b723cf961d3e', '1499813292437-0245a49931ce', '1473496169904-712b5043bfb1', '1533371452382-d45a9da51f47', '1501862700950-18382cd204ff', '1475924156734-4981409faa0e', '1505118380757-91f5f563ce8e'],
+  autumn: ['1476820865390-c52aeebb9891', '1443048997380-04e43e5d038d', '1505322137976-19d2cc8477d8', '1477414348463-c0eb7f1359b6', '1508919801845-a589e47cbaf0', '1511497584788-876760111969', '1447094240974-5e5d32152652'],
+  winter: ['1483664852095-d6cc6870702d', '1450050854492-56455110d7e4', '1478264350174-8b6b2cd64455', '1491002052846-2e52cdd8974a', '1478719059408-592965723cbc', '1445543930192-36c5df3890e0', '1513256191771-41fb8183188d'],
+  holiday: ['1512389142860-9c281c678a85', '1518199266791-5375a83190b7', '1508344928928-7137b29de216', '1543363363486-e0e64f7b6d19', '1511268559489-34b624fa1058', '1476483648948-cc7f8d689617']
 };
 
 const getThemeForDate = (dateStr) => {
@@ -67,10 +68,10 @@ const getThemeForDate = (dateStr) => {
   if (m === 2 && day >= 10 && day <= 14) return { img: getImgUrl(IMAGES.holiday, dailyIndex % IMAGES.holiday.length), fallbackImg: getImgUrl(IMAGES.holiday, 1), color: COLORS.rose };
   if (m === 7 && day >= 1 && day <= 4) return { img: getImgUrl(IMAGES.summer, dailyIndex % IMAGES.summer.length), fallbackImg: getImgUrl(IMAGES.summer, 0), color: COLORS.blue };
 
-  if (m >= 3 && m <= 5) return { img: getImgUrl(IMAGES.spring, dailyIndex % IMAGES.spring.length), fallbackImg: getImgUrl(IMAGES.spring, 1), color: COLORS.emerald }; // Spring Fallback = Flowers
-  if (m >= 6 && m <= 8) return { img: getImgUrl(IMAGES.summer, dailyIndex % IMAGES.summer.length), fallbackImg: getImgUrl(IMAGES.summer, 0), color: COLORS.sky }; // Summer Fallback = Ocean
-  if (m >= 9 && m <= 11) return { img: getImgUrl(IMAGES.autumn, dailyIndex % IMAGES.autumn.length), fallbackImg: getImgUrl(IMAGES.autumn, 0), color: COLORS.orange }; // Autumn Fallback = Leaves
-  return { img: getImgUrl(IMAGES.winter, dailyIndex % IMAGES.winter.length), fallbackImg: getImgUrl(IMAGES.winter, 0), color: COLORS.indigo }; // Winter Fallback = Snow
+  if (m >= 3 && m <= 5) return { img: getImgUrl(IMAGES.spring, dailyIndex % IMAGES.spring.length), fallbackImg: getImgUrl(IMAGES.spring, 1), color: COLORS.emerald }; 
+  if (m >= 6 && m <= 8) return { img: getImgUrl(IMAGES.summer, dailyIndex % IMAGES.summer.length), fallbackImg: getImgUrl(IMAGES.summer, 0), color: COLORS.sky }; 
+  if (m >= 9 && m <= 11) return { img: getImgUrl(IMAGES.autumn, dailyIndex % IMAGES.autumn.length), fallbackImg: getImgUrl(IMAGES.autumn, 0), color: COLORS.orange }; 
+  return { img: getImgUrl(IMAGES.winter, dailyIndex % IMAGES.winter.length), fallbackImg: getImgUrl(IMAGES.winter, 0), color: COLORS.indigo }; 
 };
 
 // --- Ultimate Error Boundary ---
@@ -145,13 +146,13 @@ const TrackerApp = () => {
   const th = currentTheme.color; 
 
   // --- IMAGE PRE-LOADER & FALLBACK ENGINE ---
-  const [activeBackground, setActiveBackground] = useState(currentTheme.fallbackImg); // Start with safe backup
+  const [activeBackground, setActiveBackground] = useState(currentTheme.fallbackImg); 
   useEffect(() => {
     let isMounted = true;
     const img = new window.Image();
     img.src = currentTheme.img;
     img.onload = () => { if (isMounted) setActiveBackground(currentTheme.img); };
-    img.onerror = () => { if (isMounted) setActiveBackground(currentTheme.fallbackImg); }; // Swap to beautiful backup!
+    img.onerror = () => { if (isMounted) setActiveBackground(currentTheme.fallbackImg); }; 
     return () => { isMounted = false; };
   }, [currentTheme.img, currentTheme.fallbackImg]);
   
@@ -179,11 +180,14 @@ const TrackerApp = () => {
   const [builderDays, setBuilderDays] = useState(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
   const [builderItems, setBuilderItems] = useState([]);
 
+  // AI & Insights State
+  const [aiInsight, setAiInsight] = useState('');
+  const [isGeneratingInsight, setIsGeneratingInsight] = useState(false);
+
   const defaultProfile = { 
     dailyGoal: 2000, proteinGoal: 150, carbsGoal: 250, fatGoal: 65,
     currentWeight: 150, targetWeight: 140, waterGoal: 80, units: 'lbs'
   };
-  // Change user default state from null to undefined so we know when Firebase is loading
   const [user, setUser] = useState(undefined);
   const [dailyLog, setDailyLog] = useState([]);
   const [routines, setRoutines] = useState([]);
@@ -219,7 +223,6 @@ const TrackerApp = () => {
 
   useEffect(() => {
     if (!auth) { setUser(null); return; }
-    // Remove the automatic anonymous sign in, and just set the user to whoever is logged in (or null)
     return onAuthStateChanged(auth, u => { setUser(u); });
   }, []);
 
@@ -258,6 +261,21 @@ const TrackerApp = () => {
     }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
   }, [dailyLog, selectedDate]);
 
+  // Analytics Engine for the 7-Day Chart
+  const last7DaysData = useMemo(() => {
+    const days = [];
+    for(let i=6; i>=0; i--) {
+      const d = new Date(selectedDate + 'T12:00:00Z');
+      d.setDate(d.getDate() - i);
+      const dStr = d.toISOString().split('T')[0];
+      const dayLogs = (dailyLog || []).filter(l => l.date === dStr && l.isEaten !== false);
+      const cals = dayLogs.reduce((s,x)=>s+(Number(x.calories)||0),0);
+      days.push({ day: d.toLocaleDateString('en-US', {weekday:'short'}), date: dStr, cals });
+    }
+    return days;
+  }, [dailyLog, selectedDate]);
+  const maxCals = Math.max(...last7DaysData.map(d => d.cals), safeDailyGoal, 1);
+
   const todayRoutines = useMemo(() => {
     const dayName = new Date(selectedDate + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short' });
     return (routines || []).filter(r => r?.days?.includes(dayName));
@@ -278,7 +296,7 @@ const TrackerApp = () => {
     } catch (error) { 
       console.error("Google login error:", error);
       if (error.code === 'auth/unauthorized-domain') {
-        setLoginError("To use Google Login here, please test locally or deploy to your Azure domain. Otherwise, click 'Continue as Guest' below to try the app!");
+        setLoginError("To use Google Login here, please test locally or deploy to your Azure domain.");
       } else {
         setLoginError(error.message);
       }
@@ -323,6 +341,43 @@ const TrackerApp = () => {
     setEditingRoutineId(null);
   };
 
+  // --- AI Coach Connection ---
+  const generateAIInsight = async () => {
+    if (!apiKey) { setAiInsight("API key not configured in environment. The AI Coach requires a valid Gemini API Key."); return; }
+    setIsGeneratingInsight(true);
+
+    const last7 = last7DaysData.map(d => `${d.date}: ${d.cals} kcal`);
+    const prompt = `Act as a supportive, expert nutrition coach. Here is the user's calorie data for the last 7 days:\n${last7.join('\n')}\nTheir daily goal is ${safeDailyGoal} kcal. Provide a short, punchy 2-sentence insight or tip based on this exact trend. Keep it encouraging and actionable. No formatting or markdown, just plain text.`;
+
+    const fetchWithRetry = async (retries = 3) => {
+      const delays = [1000, 2000, 4000];
+      for (let i = 0; i < retries; i++) {
+        try {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return await res.json();
+        } catch (err) {
+          if (i === retries - 1) throw err;
+          await new Promise(r => setTimeout(r, delays[i]));
+        }
+      }
+    };
+
+    try {
+      const data = await fetchWithRetry();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "Keep up the great work! Consistency over time is key to your success.";
+      setAiInsight(text.replace(/\*/g, ''));
+    } catch (err) {
+      setAiInsight("Unable to connect to the AI Coach at the moment. Keep pushing towards your goals!");
+    } finally {
+      setIsGeneratingInsight(false);
+    }
+  };
+
   const renderSearchEngineUI = () => (
     <div className="space-y-3">
       <div className={`relative flex items-center rounded-[24px] border-2 ${isDarkMode ? 'bg-slate-800/50' : 'bg-white/80'} backdrop-blur-sm ${th.border} focus-within:${th.ring} transition-all shadow-sm`}>
@@ -361,16 +416,14 @@ const TrackerApp = () => {
     </div>
   );
 
-  // Show a loading spinner while Firebase checks if you have a saved session
   if (user === undefined) {
     return <div className="min-h-screen bg-slate-900 flex items-center justify-center"><Loader2 className={`animate-spin ${th.text}`} size={48} /></div>;
   }
 
-  // Show the aesthetic Login Screen if the user is not logged in
   if (user === null) {
     return (
       <div className="min-h-screen font-sans flex flex-col items-center justify-center bg-slate-900 transition-colors duration-1000 relative overflow-hidden">
-        <div className="absolute inset-0 bg-cover bg-center opacity-40 transition-all duration-1000" style={{ backgroundImage: `url(${currentTheme.img})` }}></div>
+        <div className="absolute inset-0 bg-cover bg-center opacity-40 transition-all duration-1000" style={{ backgroundImage: `url('${activeBackground}')` }}></div>
         <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-md"></div>
         
         <div className="relative z-10 p-8 w-full max-w-md flex flex-col items-center text-center space-y-8 animate-in fade-in zoom-in duration-700">
@@ -392,10 +445,6 @@ const TrackerApp = () => {
                <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" /><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" /><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" /><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" /></svg>
                Sign in with Google
              </button>
-             
-             <button onClick={() => { setLoginError(''); signInAnonymously(auth); }} className="w-full py-4 bg-white/10 text-white rounded-3xl font-black text-sm flex items-center justify-center gap-3 border border-white/20 hover:bg-white/20 transition-transform active:scale-95">
-               Continue as Guest
-             </button>
            </div>
         </div>
       </div>
@@ -404,10 +453,15 @@ const TrackerApp = () => {
 
   return (
     <div className={`min-h-screen font-sans flex flex-col items-center transition-colors duration-1000 ${isDarkMode ? 'bg-slate-900' : 'bg-slate-50'}`}>
-      
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.5); border-radius: 10px; }
+      `}</style>
+
       {/* THE FALLBACK ENGINE is now actively powering this div */}
       <div 
-        className={`w-full max-w-md h-screen flex flex-col relative overflow-hidden bg-cover bg-center transition-all duration-1000 bg-slate-900`}
+        className={`w-full max-w-md h-screen flex flex-col relative overflow-hidden bg-cover bg-center transition-all duration-1000 ${th.bg}`}
         style={{ backgroundImage: `url('${activeBackground}')` }}
       >
         <div className={`absolute inset-0 transition-colors duration-1000 ${isDarkMode ? 'bg-black/60' : 'bg-black/25'}`}></div>
@@ -424,33 +478,32 @@ const TrackerApp = () => {
               <button onClick={() => { const d = new Date(selectedDate+'T12:00:00Z'); d.setDate(d.getDate()+1); setSelectedDate(d.toISOString().split('T')[0]); }} className="p-2 hover:bg-white/20 rounded-full backdrop-blur-sm transition-all"><ChevronRight /></button>
             </div>
             
-            <div className="flex items-center gap-6 mb-5">
-              <div className="bg-white/15 p-6 rounded-[32px] backdrop-blur-xl border border-white/30 text-center min-w-[120px] shadow-2xl">
-                <div className="text-4xl font-black drop-shadow-md">{safeDailyGoal - totals.calories}</div>
-                <div className="text-[10px] uppercase font-bold tracking-[0.2em] opacity-80 mt-1">Remaining</div>
-              </div>
-              <div className="flex-1 space-y-2">
-                <div className="flex justify-between items-end drop-shadow-sm"><p className="text-xs font-bold opacity-90 uppercase tracking-widest">Intake: {totals.calories}</p><p className="text-[10px] opacity-80">Goal: {safeDailyGoal}</p></div>
-                <div className="w-full h-2.5 bg-white/20 rounded-full overflow-hidden border border-white/30 shadow-inner"><div className={`h-full ${th.bg} transition-all duration-1000 ease-out`} style={{ width: `${Math.min((totals.calories / safeDailyGoal) * 100, 100)}%` }}></div></div>
-              </div>
-            </div>
-
-            <div className="flex justify-between gap-3 px-2">
-              {[
-                { label: 'Pro', val: totals.protein, goal: userProfile?.proteinGoal || 150, color: 'bg-rose-400' },
-                { label: 'Carb', val: totals.carbs, goal: userProfile?.carbsGoal || 250, color: 'bg-emerald-400' },
-                { label: 'Fat', val: totals.fat, goal: userProfile?.fatGoal || 65, color: 'bg-amber-400' }
-              ].map(m => (
-                <div key={m.label} className="flex-1 space-y-1.5">
-                  <div className="flex justify-between text-[9px] font-black uppercase tracking-widest opacity-90 drop-shadow-sm">
-                    <span>{m.label}</span>
-                    <span>{m.val}/{m.goal}</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden shadow-inner">
-                    <div className={`h-full ${m.color} transition-all duration-1000`} style={{ width: `${Math.min((m.val / Math.max(m.goal, 1)) * 100, 100)}%` }}></div>
-                  </div>
-                </div>
-              ))}
+            <div className={`p-5 rounded-[32px] backdrop-blur-xl border flex items-center justify-between shadow-2xl transition-colors ${isDarkMode ? 'bg-slate-900/40 border-slate-700/50' : 'bg-white/20 border-white/40'}`}>
+               <div className="flex flex-col">
+                 <div className="text-4xl font-black drop-shadow-md">{Math.max(safeDailyGoal - totals.calories, 0)}</div>
+                 <div className="text-[10px] uppercase font-bold tracking-[0.2em] opacity-80 mt-1">Remaining</div>
+               </div>
+               
+               <div className="flex items-center gap-4">
+                 <div className="flex flex-col gap-1.5 text-[9px] font-black uppercase tracking-widest text-right">
+                   <div className="flex items-center justify-end gap-1.5"><span className="opacity-90">Pro {totals.protein}g</span><div className="w-2 h-2 rounded-full bg-rose-400 shadow-sm"></div></div>
+                   <div className="flex items-center justify-end gap-1.5"><span className="opacity-90">Carb {totals.carbs}g</span><div className="w-2 h-2 rounded-full bg-emerald-400 shadow-sm"></div></div>
+                   <div className="flex items-center justify-end gap-1.5"><span className="opacity-90">Fat {totals.fat}g</span><div className="w-2 h-2 rounded-full bg-amber-400 shadow-sm"></div></div>
+                 </div>
+                 
+                 <div className="w-16 h-16 shrink-0 relative drop-shadow-lg">
+                   <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
+                     <circle cx="50" cy="50" r="42" fill="none" className="stroke-white/10" strokeWidth="8" />
+                     <circle cx="50" cy="50" r="42" fill="none" className="stroke-rose-400 transition-all duration-1000 ease-out" strokeWidth="8" strokeLinecap="round" strokeDasharray="263.89" strokeDashoffset={263.89 - (Math.min(totals.protein / (userProfile?.proteinGoal || 150), 1) * 263.89)} />
+                     
+                     <circle cx="50" cy="50" r="28" fill="none" className="stroke-white/10" strokeWidth="8" />
+                     <circle cx="50" cy="50" r="28" fill="none" className="stroke-emerald-400 transition-all duration-1000 ease-out" strokeWidth="8" strokeLinecap="round" strokeDasharray="175.92" strokeDashoffset={175.92 - (Math.min(totals.carbs / (userProfile?.carbsGoal || 250), 1) * 175.92)} />
+                     
+                     <circle cx="50" cy="50" r="14" fill="none" className="stroke-white/10" strokeWidth="8" />
+                     <circle cx="50" cy="50" r="14" fill="none" className="stroke-amber-400 transition-all duration-1000 ease-out" strokeWidth="8" strokeLinecap="round" strokeDasharray="87.96" strokeDashoffset={87.96 - (Math.min(totals.fat / (userProfile?.fatGoal || 65), 1) * 87.96)} />
+                   </svg>
+                 </div>
+               </div>
             </div>
           </div>
         )}
@@ -493,14 +546,10 @@ const TrackerApp = () => {
           </div>
         )}
 
-        {/* --- DYNAMIC TAB CONTENT (Now Swipeable) --- */}
-        <div 
-          onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
-          ref={scrollContainerRef} 
-          className={`flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar transition-colors duration-1000 relative z-10 rounded-t-[40px] border-t border-white/40 shadow-[0_-10px_40px_rgba(0,0,0,0.2)] ${isDarkMode ? 'bg-slate-950/85 backdrop-blur-2xl dark:border-slate-700/50' : 'bg-white/95 backdrop-blur-2xl'}`}
-        >
+        {/* --- DYNAMIC TAB CONTENT (Carousel Slider Engine) --- */}
+        <div className={`flex-1 overflow-hidden transition-colors duration-1000 relative z-10 rounded-t-[40px] border-t border-white/40 shadow-[0_-10px_40px_rgba(0,0,0,0.2)] ${isDarkMode ? 'bg-slate-950/85 backdrop-blur-2xl dark:border-slate-700/50' : 'bg-white/95 backdrop-blur-2xl'}`}>
           {isBuilding ? (
-            <div className="space-y-6 animate-in slide-in-from-bottom-4 pb-10">
+            <div className="h-full overflow-y-auto custom-scrollbar p-5 space-y-6 animate-in slide-in-from-bottom-4 pb-10">
               <div className="flex justify-between items-center"><h2 className={`text-2xl font-black ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Routine Builder</h2><button onClick={() => setIsBuilding(false)} className={`p-2 rounded-full text-slate-500 hover:text-rose-500 transition-colors ${isDarkMode ? 'bg-slate-800/50' : 'bg-slate-200/50'}`}><X size={20}/></button></div>
               <input placeholder="Name Your Routine..." className={`w-full p-5 rounded-3xl font-black text-lg focus:outline-none border ${isDarkMode ? 'bg-slate-900/60 text-white border-slate-700/50' : 'bg-white text-slate-800 border-slate-200 shadow-sm'}`} value={builderName} onChange={e => setBuilderName(e.target.value)} />
               <div className="space-y-3">
@@ -522,186 +571,245 @@ const TrackerApp = () => {
               </div>
               <button onClick={saveRoutine} className={`w-full py-5 ${th.bg} text-white rounded-3xl font-black text-lg shadow-xl ${th.shadow} flex items-center justify-center gap-3 transition-transform active:scale-95`}><Save /> Save Routine</button>
             </div>
-          ) : activeTab === 'log' ? (
-            <div className="space-y-6 animate-in fade-in pb-6">
-              {(isGoalCrushed || isProteinCrushed) && (
-                <div className={`p-4 rounded-[24px] border ${isGoalCrushed && isProteinCrushed ? 'bg-indigo-100 border-indigo-300 dark:bg-indigo-900/30' : isGoalCrushed ? 'bg-amber-100 border-amber-300 dark:bg-amber-900/30' : 'bg-emerald-100 border-emerald-300 dark:bg-emerald-900/30'} flex items-center gap-4 animate-in slide-in-from-top-4`}>
-                  <div className={`p-3 rounded-2xl ${isGoalCrushed && isProteinCrushed ? 'bg-indigo-500 shadow-indigo-500/30' : isGoalCrushed ? 'bg-amber-500 shadow-amber-500/30' : 'bg-emerald-500 shadow-emerald-500/30'} text-white shadow-lg`}>
-                    {isGoalCrushed && isProteinCrushed ? <Flame size={20}/> : isGoalCrushed ? <Trophy size={20}/> : <Medal size={20}/>}
-                  </div>
-                  <div>
-                    <p className={`text-[10px] font-black uppercase tracking-widest opacity-70 ${isGoalCrushed && isProteinCrushed ? 'text-indigo-800 dark:text-indigo-400' : isGoalCrushed ? 'text-amber-800 dark:text-amber-400' : 'text-emerald-800 dark:text-emerald-400'}`}>Accomplishment unlocked</p>
-                    <h4 className={`text-sm font-black ${isGoalCrushed && isProteinCrushed ? 'text-indigo-600 dark:text-indigo-500' : isGoalCrushed ? 'text-amber-600 dark:text-amber-500' : 'text-emerald-600 dark:text-emerald-500'}`}>{isGoalCrushed && isProteinCrushed ? 'Perfect Day!' : isGoalCrushed ? 'Calorie Goal Met!' : 'Protein Target Hit!'}</h4>
-                  </div>
-                </div>
-              )}
-              {renderSearchEngineUI()}
-              {['Breakfast', 'Lunch', 'Dinner', 'Snacks'].map(m => {
-                const mealItems = (dailyLog || []).filter(i => i.date === selectedDate && i.mealType === m);
-                return (
-                  <div key={m} className={`p-5 rounded-[32px] shadow-sm space-y-4 border ${isDarkMode ? 'bg-slate-900/40 border-slate-700/50' : 'bg-white/80 border-slate-200'}`}>
-                    <div className={`flex justify-between items-center border-b pb-3 mx-1 ${isDarkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
-                      <h3 className={`text-sm font-black uppercase tracking-widest flex items-center gap-2 ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}><div className={`w-2.5 h-2.5 rounded-full ${th.bg} shadow-md`}></div>{m}</h3>
-                      <span className={`text-[11px] font-black px-3 py-1 rounded-xl shadow-inner ${isDarkMode ? 'text-slate-400 bg-slate-800/50' : 'text-slate-600 bg-slate-100'}`}>{mealItems.reduce((s,i)=>s+(Number(i.calories)||0),0)} kcal</span>
+          ) : (
+            <div 
+              onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+              className="flex h-full w-[400%] transition-transform duration-300 ease-in-out"
+              style={{ transform: `translateX(-${tabsOrder.indexOf(activeTab) * 25}%)` }}
+            >
+              {/* === TAB 1: LOG === */}
+              <div ref={scrollContainerRef} className="w-1/4 h-full overflow-y-auto custom-scrollbar p-5 space-y-6 pb-6">
+                {(isGoalCrushed || isProteinCrushed) && (
+                  <div className={`p-4 rounded-[24px] border ${isGoalCrushed && isProteinCrushed ? 'bg-indigo-100 border-indigo-300 dark:bg-indigo-900/30' : isGoalCrushed ? 'bg-amber-100 border-amber-300 dark:bg-amber-900/30' : 'bg-emerald-100 border-emerald-300 dark:bg-emerald-900/30'} flex items-center gap-4 animate-in slide-in-from-top-4`}>
+                    <div className={`p-3 rounded-2xl ${isGoalCrushed && isProteinCrushed ? 'bg-indigo-500 shadow-indigo-500/30' : isGoalCrushed ? 'bg-amber-500 shadow-amber-500/30' : 'bg-emerald-500 shadow-emerald-500/30'} text-white shadow-lg`}>
+                      {isGoalCrushed && isProteinCrushed ? <Flame size={20}/> : isGoalCrushed ? <Trophy size={20}/> : <Medal size={20}/>}
                     </div>
-                    <div className="space-y-2">
-                      {mealItems.map(item => (
-                        <div key={item.id} className={`p-4 rounded-[24px] flex justify-between items-center shadow-sm border transition-all active:scale-[0.98] ${isDarkMode ? 'bg-slate-800/70 border-slate-700/50' : 'bg-white border-slate-100'}`}>
-                          <div className="flex items-center gap-4">
-                            <button onClick={() => updateDB('dailyLog', item.id, { ...item, isEaten: !item.isEaten })} className="transition-transform active:scale-75">
-                              {item.isEaten !== false ? <CheckCircle2 className={th.text} size={24} /> : <Circle className={`text-slate-300 ${isDarkMode ? 'dark:text-slate-600' : ''}`} size={24} />}
-                            </button>
-                            <div className={item.isEaten === false ? 'opacity-40 line-through' : ''}>
-                              <p className={`text-sm font-bold leading-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{item.name}</p>
-                              <p className="text-[10px] text-slate-500 font-bold uppercase">{item.calories} kcal</p>
+                    <div>
+                      <p className={`text-[10px] font-black uppercase tracking-widest opacity-70 ${isGoalCrushed && isProteinCrushed ? 'text-indigo-800 dark:text-indigo-400' : isGoalCrushed ? 'text-amber-800 dark:text-amber-400' : 'text-emerald-800 dark:text-emerald-400'}`}>Accomplishment unlocked</p>
+                      <h4 className={`text-sm font-black ${isGoalCrushed && isProteinCrushed ? 'text-indigo-600 dark:text-indigo-500' : isGoalCrushed ? 'text-amber-600 dark:text-amber-500' : 'text-emerald-600 dark:text-emerald-500'}`}>{isGoalCrushed && isProteinCrushed ? 'Perfect Day!' : isGoalCrushed ? 'Calorie Goal Met!' : 'Protein Target Hit!'}</h4>
+                    </div>
+                  </div>
+                )}
+                {renderSearchEngineUI()}
+                {['Breakfast', 'Lunch', 'Dinner', 'Snacks'].map(m => {
+                  const mealItems = (dailyLog || []).filter(i => i.date === selectedDate && i.mealType === m);
+                  return (
+                    <div key={m} className={`p-5 rounded-[32px] shadow-sm space-y-4 border ${isDarkMode ? 'bg-slate-900/40 border-slate-700/50' : 'bg-white/80 border-slate-200'}`}>
+                      <div className={`flex justify-between items-center border-b pb-3 mx-1 ${isDarkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
+                        <h3 className={`text-sm font-black uppercase tracking-widest flex items-center gap-2 ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}><div className={`w-2.5 h-2.5 rounded-full ${th.bg} shadow-md`}></div>{m}</h3>
+                        <span className={`text-[11px] font-black px-3 py-1 rounded-xl shadow-inner ${isDarkMode ? 'text-slate-400 bg-slate-800/50' : 'text-slate-600 bg-slate-100'}`}>{mealItems.reduce((s,i)=>s+(Number(i.calories)||0),0)} kcal</span>
+                      </div>
+                      <div className="space-y-2">
+                        {mealItems.map(item => (
+                          <div key={item.id} className={`p-4 rounded-[24px] flex justify-between items-center shadow-sm border transition-all active:scale-[0.98] ${isDarkMode ? 'bg-slate-800/70 border-slate-700/50' : 'bg-white border-slate-100'}`}>
+                            <div className="flex items-center gap-4">
+                              <button onClick={() => updateDB('dailyLog', item.id, { ...item, isEaten: !item.isEaten })} className="transition-transform active:scale-75">
+                                {item.isEaten !== false ? <CheckCircle2 className={th.text} size={24} /> : <Circle className={`text-slate-300 ${isDarkMode ? 'dark:text-slate-600' : ''}`} size={24} />}
+                              </button>
+                              <div className={item.isEaten === false ? 'opacity-40 line-through' : ''}>
+                                <p className={`text-sm font-bold leading-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{item.name}</p>
+                                <p className="text-[10px] text-slate-500 font-bold uppercase">{item.calories} kcal</p>
+                              </div>
                             </div>
+                            <button onClick={() => updateDB('dailyLog', item.id, null, true)} className="p-2 text-slate-300 hover:text-rose-400 transition-colors"><Trash2 size={18}/></button>
                           </div>
-                          <button onClick={() => updateDB('dailyLog', item.id, null, true)} className="p-2 text-slate-300 hover:text-rose-400 transition-colors"><Trash2 size={18}/></button>
-                        </div>
-                      ))}
-                      <button onClick={() => { setMealType(m); searchInputRef.current?.focus(); }} className={`w-full py-4 border-2 border-dashed rounded-3xl text-[10px] font-black uppercase text-slate-400 hover:${th.bgLight} transition-all flex items-center justify-center gap-2 ${isDarkMode ? 'border-slate-600' : 'border-slate-300 hover:text-slate-700'}`}>
-                        <Plus size={14}/> Add to {m}
-                      </button>
+                        ))}
+                        <button onClick={() => { setMealType(m); searchInputRef.current?.focus(); }} className={`w-full py-4 border-2 border-dashed rounded-3xl text-[10px] font-black uppercase text-slate-400 hover:${th.bgLight} transition-all flex items-center justify-center gap-2 ${isDarkMode ? 'border-slate-600' : 'border-slate-300 hover:text-slate-700'}`}>
+                          <Plus size={14}/> Add to {m}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : activeTab === 'routines' ? (
-            <div className="space-y-4 animate-in fade-in pb-6">
-              <button onClick={() => { setIsBuilding(true); setEditingRoutineId(null); setBuilderName(''); setBuilderItems([]); setSearchQuery(''); setSearchResults([]); setCustomMacros({calories:'',protein:'',carbs:'',fat:''}); }} className={`w-full py-5 border-2 border-dashed ${th.border} ${th.text} rounded-[32px] font-black tracking-wide text-sm flex items-center justify-center gap-3 hover:${th.bgLight} transition-colors`}>
-                <div className={`p-1 rounded-lg shadow-sm ${isDarkMode ? 'bg-slate-800' : 'bg-white'}`}><Plus size={18}/></div> Create New Routine
-              </button>
-              {(routines || []).map(r => {
-                const isApplied = (dailyLog || []).some(log => log.date === selectedDate && log.routineId === r.id);
-                return (
-                  <div key={r.id} className={`p-6 rounded-[40px] border shadow-sm space-y-4 ${isDarkMode ? 'bg-slate-900/60 border-slate-700/50' : 'bg-white/80 border-slate-200'}`}>
-                    <h4 className={`font-black text-lg ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{r.name || 'Untitled'}</h4>
-                    <div className="flex gap-2">
-                      <button onClick={() => isApplied ? handleRemoveRoutine(r.id) : handleApplyRoutine(r)} className={`flex-1 py-3 ${isApplied ? 'bg-rose-50 text-rose-600' : th.bgLight + ' ' + th.text} rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-2`}>
-                        {isApplied ? <X size={16}/> : <CheckCircle2 size={16}/>} {isApplied ? 'Remove' : 'Apply'}
-                      </button>
-                      <button onClick={() => updateDB('routines', r.id, null, true)} className={`p-3 rounded-2xl text-slate-400 hover:text-rose-500 transition-colors shadow-sm ${isDarkMode ? 'bg-slate-800' : 'bg-white'}`}><Trash2 size={18}/></button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : activeTab === 'plan' ? (
-            <div className="space-y-6 animate-in fade-in pb-6">
-              <div className="flex items-center gap-3"><CalendarDays className={th.text} size={24} /><h3 className={`font-black text-xl tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Activity Log</h3></div>
-              <div className={`p-5 rounded-[40px] border shadow-sm ${isDarkMode ? 'bg-slate-900/60 border-slate-700/50' : 'bg-white/80 border-slate-200'}`}>
-                <h3 className="font-black text-sm uppercase tracking-widest text-slate-500 mb-4">{calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h3>
-                <div className="grid grid-cols-7 gap-2.5">
-                  {(() => {
-                    const days = [], first = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1).getDay(), total = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth()+1, 0).getDate();
-                    for(let i=0; i<first; i++) days.push(null);
-                    for(let i=1; i<=total; i++) {
-                      const dStr = `${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth()+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
-                      const cal = (dailyLog || []).filter(l => l.date === dStr && l.isEaten !== false).reduce((s,x)=>s+(Number(x.calories)||0),0);
-                      days.push({ day: i, date: dStr, total: cal });
-                    }
-                    return days;
-                  })().map((d, i) => {
-                    if (!d) return <div key={i}></div>;
-                    const isSelected = viewingHistoryDetail === d.date;
-                    const isToday = d.date === new Date().toISOString().split('T')[0];
-                    const hasData = d.total > 0;
-                    const isOver = d.total > safeDailyGoal;
-
-                    let baseBg = 'bg-white/50 dark:bg-slate-800/30';
-                    let baseText = 'text-slate-500 dark:text-white';
-                    let border = 'border border-transparent dark:border-slate-700/50';
-
-                    if (hasData) {
-                      if (isOver) {
-                        baseBg = 'bg-rose-100 dark:bg-rose-500/30';
-                        baseText = 'text-rose-600 dark:text-white';
-                        border = 'border border-rose-200 dark:border-rose-400/50';
-                      } else {
-                        baseBg = `${th.bgLight}`;
-                        baseText = `${th.text} dark:text-white`;
-                        border = `border ${th.border}`;
-                      }
-                    }
-
-                    let ringClass = '';
-                    if (isSelected) ringClass = `ring-2 ${th.ring} ring-offset-2 dark:ring-offset-slate-900 z-10`;
-                    else if (isToday) ringClass = `ring-2 ring-emerald-400 dark:ring-emerald-500 ring-offset-2 dark:ring-offset-slate-900 z-10`;
-
-                    return (
-                      <button key={d.date} onClick={() => setViewingHistoryDetail(d.date)} className={`aspect-square rounded-2xl flex items-center justify-center transition-all active:scale-90 shadow-sm ${baseBg} ${baseText} ${border} ${ringClass}`}>
-                        <span className="text-[12px] font-black">{d.day}</span>
-                      </button>
-                    );
-                  })}
-                </div>
+                  );
+                })}
               </div>
 
-              {/* History Detail Overlay */}
-              {viewingHistoryDetail && (
-                <div className={`p-6 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-2 ${th.border} rounded-[40px] animate-in slide-in-from-top-4 shadow-xl`}>
-                   <div className="flex justify-between items-center border-b border-slate-200/50 dark:border-slate-700/50 pb-4 mb-4">
-                     <h4 className="font-black text-xs uppercase tracking-[0.2em] dark:text-white">{new Date(viewingHistoryDetail + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' })}</h4>
-                     <button onClick={() => setViewingHistoryDetail(null)} className="p-2 bg-white dark:bg-slate-800 rounded-full shadow-sm"><X size={16}/></button>
+              {/* === TAB 2: ROUTINES === */}
+              <div className="w-1/4 h-full overflow-y-auto custom-scrollbar p-5 space-y-4 pb-6">
+                <button onClick={() => { setIsBuilding(true); setEditingRoutineId(null); setBuilderName(''); setBuilderItems([]); setSearchQuery(''); setSearchResults([]); setCustomMacros({calories:'',protein:'',carbs:'',fat:''}); }} className={`w-full py-5 border-2 border-dashed ${th.border} ${th.text} rounded-[32px] font-black tracking-wide text-sm flex items-center justify-center gap-3 hover:${th.bgLight} transition-colors`}>
+                  <div className={`p-1 rounded-lg shadow-sm ${isDarkMode ? 'bg-slate-800' : 'bg-white'}`}><Plus size={18}/></div> Create New Routine
+                </button>
+                {(routines || []).map(r => {
+                  const isApplied = (dailyLog || []).some(log => log.date === selectedDate && log.routineId === r.id);
+                  return (
+                    <div key={r.id} className={`p-6 rounded-[40px] border shadow-sm space-y-4 ${isDarkMode ? 'bg-slate-900/60 border-slate-700/50' : 'bg-white/80 border-slate-200'}`}>
+                      <h4 className={`font-black text-lg ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{r.name || 'Untitled'}</h4>
+                      <div className="flex gap-2">
+                        <button onClick={() => isApplied ? handleRemoveRoutine(r.id) : handleApplyRoutine(r)} className={`flex-1 py-3 ${isApplied ? 'bg-rose-50 text-rose-600' : th.bgLight + ' ' + th.text} rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-2`}>
+                          {isApplied ? <X size={16}/> : <CheckCircle2 size={16}/>} {isApplied ? 'Remove' : 'Apply'}
+                        </button>
+                        <button onClick={() => updateDB('routines', r.id, null, true)} className={`p-3 rounded-2xl text-slate-400 hover:text-rose-500 transition-colors shadow-sm ${isDarkMode ? 'bg-slate-800' : 'bg-white'}`}><Trash2 size={18}/></button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* === TAB 3: PLAN & ANALYTICS === */}
+              <div className="w-1/4 h-full overflow-y-auto custom-scrollbar p-5 space-y-6 pb-6">
+                <div className="flex items-center gap-3"><TrendingUp className={th.text} size={24} /><h3 className={`font-black text-xl tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Insights & Analytics</h3></div>
+                
+                {/* --- AI COACH CARD --- */}
+                <div className={`p-6 rounded-[32px] border shadow-sm ${isDarkMode ? 'bg-slate-900/60 border-slate-700/50' : 'bg-white/80 border-slate-200'} relative overflow-hidden`}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className={`p-3 rounded-2xl ${th.bgLight} ${th.text}`}><Sparkle size={18}/></div>
+                    <h4 className={`font-black text-sm uppercase tracking-widest ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>AI Coach</h4>
+                  </div>
+                  {aiInsight ? (
+                    <p className={`text-sm font-bold leading-relaxed mb-6 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{aiInsight}</p>
+                  ) : (
+                    <p className={`text-xs font-bold leading-relaxed mb-6 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Let AI analyze your last 7 days and give you a personalized nutrition tip.</p>
+                  )}
+                  <button onClick={generateAIInsight} disabled={isGeneratingInsight} className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-transform active:scale-95 flex items-center justify-center gap-2 ${isGeneratingInsight ? (isDarkMode ? 'bg-slate-800 text-slate-500' : 'bg-slate-200 text-slate-400') : th.bg + ' text-white shadow-md'}`}>
+                    {isGeneratingInsight ? <Loader2 className="animate-spin" size={16}/> : <Sparkle size={16}/>}
+                    {isGeneratingInsight ? 'Analyzing...' : 'Generate Insight'}
+                  </button>
+                </div>
+
+                {/* --- 7-DAY TRENDS CHART --- */}
+                <div className={`p-6 rounded-[32px] border shadow-sm ${isDarkMode ? 'bg-slate-900/60 border-slate-700/50' : 'bg-white/80 border-slate-200'}`}>
+                   <h4 className={`text-xs font-black uppercase tracking-widest mb-6 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>7-Day Calorie Trend</h4>
+                   <div className="flex items-end justify-between h-32 gap-1.5 mb-3">
+                     {last7DaysData.map((d, i) => {
+                       const heightPct = Math.min((d.cals / maxCals) * 100, 100);
+                       const isOver = d.cals > safeDailyGoal;
+                       return (
+                         <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
+                           <div className={`w-full relative flex items-end justify-center h-full rounded-t-lg overflow-hidden ${isDarkMode ? 'bg-slate-800/50' : 'bg-slate-100'}`}>
+                             <div className={`w-full rounded-t-lg transition-all duration-1000 ${isOver ? 'bg-rose-400' : th.bg}`} style={{ height: `${heightPct}%` }}></div>
+                           </div>
+                           <span className={`text-[9px] font-black uppercase ${d.date === selectedDate ? th.text : 'text-slate-400'}`}>{d.day}</span>
+                         </div>
+                       )
+                     })}
                    </div>
-                   <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-2">
-                     {(dailyLog || []).filter(l => l.date === viewingHistoryDetail).map(item => (
-                       <div key={item.id} className="flex justify-between items-center p-4 bg-white/90 dark:bg-slate-800/90 rounded-[24px] shadow-sm border border-slate-100 dark:border-slate-700/50">
-                         <span className="text-xs font-bold dark:text-white truncate mr-4">{item.name}</span>
-                         <span className={`text-xs font-black ${th.text} whitespace-nowrap`}>{item.calories} kcal</span>
-                       </div>
-                     ))}
-                     {(dailyLog || []).filter(l => l.date === viewingHistoryDetail).length === 0 && <p className="text-center text-[10px] text-slate-400 font-bold uppercase tracking-widest py-6">No food logged</p>}
+                   <div className={`flex justify-between items-center pt-4 border-t ${isDarkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
+                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Daily Goal</div>
+                      <div className="text-[10px] font-black text-slate-400">{safeDailyGoal} kcal</div>
                    </div>
                 </div>
-              )}
-            </div>
-            
-          ) : (
-            <div className="space-y-6 animate-in fade-in pb-6">
-               <div className="flex items-center gap-3"><Settings className={th.text} size={24} /><h3 className={`font-black text-xl tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Settings</h3></div>
-               
-               <div className={`p-6 rounded-[32px] border space-y-6 shadow-sm ${isDarkMode ? 'bg-slate-900/60 border-slate-700/50' : 'bg-white/80 border-slate-200'}`}>
-                  <h4 className="text-xs font-black uppercase text-slate-500 flex items-center gap-2"><Target size={14}/> Nutrition Targets</h4>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-slate-400 block text-center">Daily Calories</label>
-                    <SafeInput type="number" className={`w-full p-4 rounded-2xl font-black text-2xl text-center border focus:ring-2 ${th.ring} ${isDarkMode ? 'bg-slate-800 text-white border-slate-700' : 'bg-white text-slate-800 border-slate-200 shadow-sm'}`} value={userProfile?.dailyGoal ?? 2000} onChange={v => handleProfileUpdate('dailyGoal', v)} />
-                  </div>
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      { l: 'Pro', k: 'proteinGoal', c: 'text-rose-500', bg: isDarkMode ? 'bg-rose-900/20' : 'bg-rose-50' },
-                      { l: 'Carb', k: 'carbsGoal', c: 'text-emerald-500', bg: isDarkMode ? 'bg-emerald-900/20' : 'bg-emerald-50' },
-                      { l: 'Fat', k: 'fatGoal', c: 'text-amber-500', bg: isDarkMode ? 'bg-amber-900/20' : 'bg-amber-50' }
-                    ].map(g => (
-                      <div key={g.k} className="space-y-1">
-                        <label className={`text-[9px] font-black uppercase text-center block ${g.c}`}>{g.l}</label>
-                        <SafeInput type="number" className={`w-full p-3 ${g.bg} rounded-xl font-black text-center border ${isDarkMode ? 'border-transparent text-white' : 'border-slate-100 text-slate-800 shadow-sm'}`} value={userProfile?.[g.k]} onChange={v => handleProfileUpdate(g.k, v)} />
-                      </div>
-                    ))}
-                  </div>
-               </div>
 
-               <div className={`p-6 rounded-[32px] border space-y-6 shadow-sm ${isDarkMode ? 'bg-slate-900/60 border-slate-700/50' : 'bg-white/80 border-slate-200'}`}>
-                  <div className="flex justify-between items-center"><h4 className="text-xs font-black uppercase text-slate-500 flex items-center gap-2"><Scale size={14}/> Body Metrics</h4><button onClick={() => handleProfileUpdate('units', userProfile?.units === 'kg' ? 'lbs' : 'kg', true)} className="text-[9px] font-black text-indigo-500 px-2 py-1 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">{userProfile?.units || 'lbs'}</button></div>
-                  <div className="grid grid-cols-2 gap-3">
-                     <div className="space-y-1"><label className="text-[9px] font-black uppercase text-slate-400 block text-center">Current</label><SafeInput type="number" className={`w-full p-3 rounded-xl font-black text-center shadow-sm ${isDarkMode ? 'bg-slate-800 text-white border-transparent' : 'bg-white text-slate-800 border border-slate-200'}`} value={userProfile?.currentWeight} onChange={v => handleProfileUpdate('currentWeight', v)} /></div>
-                     <div className="space-y-1"><label className={`text-[9px] font-black uppercase ${th.text} block text-center`}>Goal</label><SafeInput type="number" className={`w-full p-3 ${th.bgLight} rounded-xl font-black text-center shadow-sm ${isDarkMode ? 'text-white border-transparent' : 'text-slate-800 border border-slate-100'}`} value={userProfile?.targetWeight} onChange={v => handleProfileUpdate('targetWeight', v)} /></div>
+                {/* --- MONTHLY HISTORY CALENDAR --- */}
+                <div className={`p-5 rounded-[40px] border shadow-sm ${isDarkMode ? 'bg-slate-900/60 border-slate-700/50' : 'bg-white/80 border-slate-200'}`}>
+                  <div className="flex justify-between items-center mb-4 pb-3">
+                     <h3 className="font-black text-sm uppercase tracking-widest text-slate-500">{calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h3>
+                     <div className="flex gap-1">
+                       <button onClick={() => setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))} className={`p-2 rounded-xl shadow-sm ${isDarkMode ? 'bg-slate-800 text-white' : 'bg-white'}`}><ChevronLeft size={14}/></button>
+                       <button onClick={() => setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))} className={`p-2 rounded-xl shadow-sm ${isDarkMode ? 'bg-slate-800 text-white' : 'bg-white'}`}><ChevronRight size={14}/></button>
+                     </div>
                   </div>
-                  <div className={`pt-4 border-t ${isDarkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
-                    <label className="text-[10px] font-black uppercase text-slate-400 mb-2 flex items-center gap-2 justify-center"><Droplets size={12} className="text-blue-500"/> Daily Water (oz)</label>
-                    <SafeInput type="number" className={`w-full p-4 rounded-2xl font-black text-xl text-center shadow-sm ${isDarkMode ? 'bg-blue-900/20 text-white border-transparent' : 'bg-blue-50 text-slate-800 border border-blue-100'}`} value={userProfile?.waterGoal} onChange={v => handleProfileUpdate('waterGoal', v)} />
+                  <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
+                    {['S','M','T','W','T','F','S'].map((d, i) => <div key={`hdr-cal-${i}`}>{d}</div>)}
                   </div>
-               </div>
+                  <div className="grid grid-cols-7 gap-2.5">
+                    {(() => {
+                      const days = [], first = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1).getDay(), total = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth()+1, 0).getDate();
+                      for(let i=0; i<first; i++) days.push(null);
+                      for(let i=1; i<=total; i++) {
+                        const dStr = `${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth()+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+                        const cal = (dailyLog || []).filter(l => l.date === dStr && l.isEaten !== false).reduce((s,x)=>s+(Number(x.calories)||0),0);
+                        days.push({ day: i, date: dStr, total: cal });
+                      }
+                      return days;
+                    })().map((d, i) => {
+                      if (!d) return <div key={i}></div>;
+                      const isSelected = viewingHistoryDetail === d.date;
+                      const isToday = d.date === new Date().toISOString().split('T')[0];
+                      const hasData = d.total > 0;
+                      const isOver = d.total > safeDailyGoal;
 
-               <button onClick={toggleTheme} className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 font-bold shadow-sm border transition-transform active:scale-95 ${isDarkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-white text-slate-600 border-slate-200'}`}>
-                  {isDarkMode ? <Sun size={18} className="text-amber-500" /> : <Moon size={18} className={th.text} />}
-                  {isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-               </button>
+                      let baseBg = isDarkMode ? 'bg-slate-800/30' : 'bg-white/50';
+                      let baseText = isDarkMode ? 'text-white' : 'text-slate-500';
+                      let border = 'border border-transparent';
 
-               <button onClick={handleLogout} className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 font-bold shadow-sm border transition-transform active:scale-95 text-rose-500 ${isDarkMode ? 'bg-rose-900/20 border-rose-900/50' : 'bg-rose-50 border-rose-100'}`}>
-                  <LogOut size={18} /> Sign Out
-               </button>
+                      if (hasData) {
+                        if (isOver) {
+                          baseBg = isDarkMode ? 'bg-rose-500/30' : 'bg-rose-100';
+                          baseText = isDarkMode ? 'text-white' : 'text-rose-600';
+                          border = isDarkMode ? 'border-rose-400/50' : 'border-rose-200';
+                        } else {
+                          baseBg = th.bgLight;
+                          baseText = `${th.text} dark:text-white`;
+                          border = `border ${th.border}`;
+                        }
+                      }
+
+                      let ringClass = '';
+                      if (isSelected) ringClass = `ring-2 ${th.ring} ring-offset-2 dark:ring-offset-slate-900 z-10`;
+                      else if (isToday) ringClass = `ring-2 ring-emerald-400 dark:ring-emerald-500 ring-offset-2 dark:ring-offset-slate-900 z-10`;
+
+                      return (
+                        <button key={d.date} onClick={() => setViewingHistoryDetail(d.date)} className={`aspect-square rounded-2xl flex items-center justify-center transition-all active:scale-90 shadow-sm ${baseBg} ${baseText} ${border} ${ringClass}`}>
+                          <span className="text-[12px] font-black">{d.day}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {viewingHistoryDetail && (
+                  <div className={`p-6 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-2 ${th.border} rounded-[40px] animate-in slide-in-from-top-4 shadow-xl`}>
+                     <div className="flex justify-between items-center border-b border-slate-200/50 dark:border-slate-700/50 pb-4 mb-4">
+                       <h4 className="font-black text-xs uppercase tracking-[0.2em] dark:text-white">{new Date(viewingHistoryDetail + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' })}</h4>
+                       <button onClick={() => setViewingHistoryDetail(null)} className="p-2 bg-white dark:bg-slate-800 rounded-full shadow-sm"><X size={16}/></button>
+                     </div>
+                     <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-2">
+                       {(dailyLog || []).filter(l => l.date === viewingHistoryDetail).map(item => (
+                         <div key={item.id} className="flex justify-between items-center p-4 bg-white/90 dark:bg-slate-800/90 rounded-[24px] shadow-sm border border-slate-100 dark:border-slate-700/50">
+                           <span className="text-xs font-bold dark:text-white truncate mr-4">{item.name}</span>
+                           <span className={`text-xs font-black ${th.text} whitespace-nowrap`}>{item.calories} kcal</span>
+                         </div>
+                       ))}
+                       {(dailyLog || []).filter(l => l.date === viewingHistoryDetail).length === 0 && <p className="text-center text-[10px] text-slate-400 font-bold uppercase tracking-widest py-6">No food logged</p>}
+                     </div>
+                  </div>
+                )}
+              </div>
+
+              {/* === TAB 4: SETTINGS === */}
+              <div className="w-1/4 h-full overflow-y-auto custom-scrollbar p-5 space-y-6 pb-6">
+                 <div className="flex items-center gap-3"><Settings className={th.text} size={24} /><h3 className={`font-black text-xl tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Settings</h3></div>
+                 
+                 <div className={`p-6 rounded-[32px] border space-y-6 shadow-sm ${isDarkMode ? 'bg-slate-900/60 border-slate-700/50' : 'bg-white/80 border-slate-200'}`}>
+                    <h4 className="text-xs font-black uppercase text-slate-500 flex items-center gap-2"><Target size={14}/> Nutrition Targets</h4>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-slate-400 block text-center">Daily Calories</label>
+                      <SafeInput type="number" className={`w-full p-4 rounded-2xl font-black text-2xl text-center border focus:ring-2 ${th.ring} ${isDarkMode ? 'bg-slate-800 text-white border-slate-700' : 'bg-white text-slate-800 border-slate-200 shadow-sm'}`} value={userProfile?.dailyGoal ?? 2000} onChange={v => handleProfileUpdate('dailyGoal', v)} />
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { l: 'Pro', k: 'proteinGoal', c: 'text-rose-500', bg: isDarkMode ? 'bg-rose-900/20' : 'bg-rose-50' },
+                        { l: 'Carb', k: 'carbsGoal', c: 'text-emerald-500', bg: isDarkMode ? 'bg-emerald-900/20' : 'bg-emerald-50' },
+                        { l: 'Fat', k: 'fatGoal', c: 'text-amber-500', bg: isDarkMode ? 'bg-amber-900/20' : 'bg-amber-50' }
+                      ].map(g => (
+                        <div key={g.k} className="space-y-1">
+                          <label className={`text-[9px] font-black uppercase text-center block ${g.c}`}>{g.l}</label>
+                          <SafeInput type="number" className={`w-full p-3 ${g.bg} rounded-xl font-black text-center border ${isDarkMode ? 'border-transparent text-white' : 'border-slate-100 text-slate-800 shadow-sm'}`} value={userProfile?.[g.k]} onChange={v => handleProfileUpdate(g.k, v)} />
+                        </div>
+                      ))}
+                    </div>
+                 </div>
+
+                 <div className={`p-6 rounded-[32px] border space-y-6 shadow-sm ${isDarkMode ? 'bg-slate-900/60 border-slate-700/50' : 'bg-white/80 border-slate-200'}`}>
+                    <div className="flex justify-between items-center"><h4 className="text-xs font-black uppercase text-slate-500 flex items-center gap-2"><Scale size={14}/> Body Metrics</h4><button onClick={() => handleProfileUpdate('units', userProfile?.units === 'kg' ? 'lbs' : 'kg', true)} className="text-[9px] font-black text-indigo-500 px-2 py-1 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">{userProfile?.units || 'lbs'}</button></div>
+                    <div className="grid grid-cols-2 gap-3">
+                       <div className="space-y-1"><label className="text-[9px] font-black uppercase text-slate-400 block text-center">Current</label><SafeInput type="number" className={`w-full p-3 rounded-xl font-black text-center shadow-sm ${isDarkMode ? 'bg-slate-800 text-white border-transparent' : 'bg-white text-slate-800 border border-slate-200'}`} value={userProfile?.currentWeight} onChange={v => handleProfileUpdate('currentWeight', v)} /></div>
+                       <div className="space-y-1"><label className={`text-[9px] font-black uppercase ${th.text} block text-center`}>Goal</label><SafeInput type="number" className={`w-full p-3 ${th.bgLight} rounded-xl font-black text-center shadow-sm ${isDarkMode ? 'text-white border-transparent' : 'text-slate-800 border border-slate-100'}`} value={userProfile?.targetWeight} onChange={v => handleProfileUpdate('targetWeight', v)} /></div>
+                    </div>
+                    <div className={`pt-4 border-t ${isDarkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
+                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 flex items-center gap-2 justify-center"><Droplets size={12} className="text-blue-500"/> Daily Water (oz)</label>
+                      <SafeInput type="number" className={`w-full p-4 rounded-2xl font-black text-xl text-center shadow-sm ${isDarkMode ? 'bg-blue-900/20 text-white border-transparent' : 'bg-blue-50 text-slate-800 border border-blue-100'}`} value={userProfile?.waterGoal} onChange={v => handleProfileUpdate('waterGoal', v)} />
+                    </div>
+                 </div>
+
+                 <button onClick={toggleTheme} className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 font-bold shadow-sm border transition-transform active:scale-95 ${isDarkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-white text-slate-600 border-slate-200'}`}>
+                    {isDarkMode ? <Sun size={18} className="text-amber-500" /> : <Moon size={18} className={th.text} />}
+                    {isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                 </button>
+
+                 <button onClick={handleLogout} className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 font-bold shadow-sm border transition-transform active:scale-95 text-rose-500 ${isDarkMode ? 'bg-rose-900/20 border-rose-900/50' : 'bg-rose-50 border-rose-100'}`}>
+                    <LogOut size={18} /> Sign Out
+                 </button>
+              </div>
             </div>
           )}
         </div>
@@ -709,7 +817,7 @@ const TrackerApp = () => {
         {!isBuilding && (
           <div className={`shrink-0 border-t flex justify-around py-5 pb-9 sm:pb-5 transition-all relative z-20 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] ${isDarkMode ? 'bg-slate-950/85 backdrop-blur-2xl border-slate-700/50' : 'bg-white/95 backdrop-blur-2xl border-white/40'}`}>
             {['log', 'routines', 'plan', 'settings'].map((t, idx) => {
-              const Icons = [Clock, ListChecks, CalendarDays, Settings];
+              const Icons = [Clock, ListChecks, TrendingUp, Settings];
               const Icon = Icons[idx];
               return (
                 <button key={t} onClick={() => setActiveTab(t)} className={activeTab === t ? `${th.text} scale-125` : 'text-slate-400 hover:text-slate-500 dark:hover:text-slate-300'}>
