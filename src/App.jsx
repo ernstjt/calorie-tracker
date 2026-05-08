@@ -11,8 +11,6 @@ import {
 
 // --- Configuration ---
 const APP_ID = 'calorie-tracker-v1';
-
-// AZURE DEPLOYMENT: These are your active keys
 const USDA_API_KEY = 'lkRdpKqn24LgJ3oDTYpLyXyQH7elck6d4GTiOR9Q'; 
 
 const firebaseConfig = {
@@ -96,6 +94,8 @@ const SafeInput = ({ value, onChange, ...props }) => {
 
 const TrackerApp = () => {
   const [activeTab, setActiveTab] = useState('log'); 
+  const tabsOrder = ['log', 'routines', 'plan', 'settings'];
+
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [pickerMonth, setPickerMonth] = useState(new Date());
@@ -103,6 +103,29 @@ const TrackerApp = () => {
   const [viewingHistoryDetail, setViewingHistoryDetail] = useState(null);
   const searchInputRef = useRef(null);
   const scrollContainerRef = useRef(null);
+
+  // --- SWIPE LOGIC ---
+  const touchStart = useRef(null);
+  const touchEnd = useRef(null);
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e) => {
+    touchEnd.current = null;
+    touchStart.current = { x: e.targetTouches[0].clientX, y: e.targetTouches[0].clientY };
+  };
+  const onTouchMove = (e) => {
+    touchEnd.current = { x: e.targetTouches[0].clientX, y: e.targetTouches[0].clientY };
+  };
+  const onTouchEnd = () => {
+    if (!touchStart.current || !touchEnd.current || isBuilding) return;
+    const distanceX = touchStart.current.x - touchEnd.current.x;
+    const distanceY = touchStart.current.y - touchEnd.current.y;
+    if (Math.abs(distanceX) > Math.abs(distanceY) && Math.abs(distanceX) > minSwipeDistance) {
+      const currentIndex = tabsOrder.indexOf(activeTab);
+      if (distanceX > 0 && currentIndex < tabsOrder.length - 1) setActiveTab(tabsOrder[currentIndex + 1]);
+      else if (distanceX < 0 && currentIndex > 0) setActiveTab(tabsOrder[currentIndex - 1]);
+    }
+  };
   
   const currentTheme = useMemo(() => getThemeForDate(selectedDate), [selectedDate]);
   const th = currentTheme.color; 
@@ -200,7 +223,6 @@ const TrackerApp = () => {
     updateDB('profile', 'main', { ...userProfile, [key]: parsedVal });
   };
 
-  // --- Calculations ---
   const safeDailyGoal = Math.max(Number(userProfile?.dailyGoal) || 2000, 1);
   const totals = useMemo(() => {
     return (dailyLog || []).filter(i => i.date === selectedDate && i.isEaten !== false).reduce((acc, i) => {
@@ -214,16 +236,12 @@ const TrackerApp = () => {
     return (routines || []).filter(r => r?.days?.includes(dayName));
   }, [routines, selectedDate]);
 
-  // --- Rewards Engine ---
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
-  // Triggers "End of Day" if checking a past date, or if it's currently after 7:00 PM local time
   const isEndOfDay = selectedDate < todayStr || (selectedDate === todayStr && today.getHours() >= 19); 
-  
   const isGoalCrushed = isEndOfDay && totals.calories > 0 && totals.calories <= safeDailyGoal;
   const isProteinCrushed = totals.protein > 0 && totals.protein >= (userProfile?.proteinGoal || 150);
 
-  // --- Actions ---
   const handleAddItem = (foodItem) => {
     if (isBuilding) {
       setBuilderItems([...(builderItems || []), { ...foodItem, id: Date.now().toString() + Math.floor(Math.random()*1000), mealType }]);
@@ -258,7 +276,6 @@ const TrackerApp = () => {
     setEditingRoutineId(null);
   };
 
-  // --- Unified Search UI Render Function ---
   const renderSearchEngineUI = () => (
     <div className="space-y-3">
       <div className={`relative flex items-center rounded-[24px] border-2 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm ${th.border} focus-within:${th.ring} transition-all shadow-sm`}>
@@ -274,21 +291,18 @@ const TrackerApp = () => {
           <div className="flex gap-1 p-1 mb-2">
              {['Breakfast','Lunch','Dinner','Snacks'].map(m => <button key={m} onClick={() => setMealType(m)} className={`flex-1 py-2 text-[9px] font-black uppercase rounded-xl transition-all ${mealType === m ? `${th.bg} text-white shadow-md` : `text-slate-500 bg-slate-100 dark:bg-slate-800 hover:${th.bgLight}`}`}>{m}</button>)}
           </div>
-          
           {searchResults.map(f => (
             <button key={f.id} onClick={() => handleAddItem(f)} className={`w-full text-left p-4 hover:${th.bgLight} rounded-2xl flex justify-between items-center transition-colors`}>
               <div className="flex-1 mr-4 overflow-hidden"><p className="text-xs font-bold dark:text-white truncate">{f.name}</p><p className="text-[10px] text-slate-400 font-bold uppercase truncate">{f.brand || 'USDA'}</p></div>
               <div className={`text-right ${th.text} font-black text-xs whitespace-nowrap ${th.bgLight} px-3 py-1.5 rounded-xl`}>{f.calories} kcal</div>
             </button>
           ))}
-
           <div className={`p-3 ${th.bgLight} rounded-2xl mt-2 border ${th.border}`}>
              <p className={`text-[10px] font-black ${th.text} uppercase tracking-widest mb-2 px-1 opacity-70`}>Or Add Custom Entry</p>
              <div className="grid grid-cols-4 gap-2 mb-2">
-               <input type="number" placeholder="kcal" value={customMacros.calories} onChange={e => setCustomMacros({...customMacros, calories: e.target.value})} className="w-full bg-white dark:bg-slate-800 p-2 rounded-xl text-[10px] font-bold dark:text-white text-center focus:outline-none shadow-sm" />
-               <input type="number" placeholder="Pro" value={customMacros.protein} onChange={e => setCustomMacros({...customMacros, protein: e.target.value})} className="w-full bg-white dark:bg-slate-800 p-2 rounded-xl text-[10px] font-bold dark:text-white text-center focus:outline-none shadow-sm" />
-               <input type="number" placeholder="Carb" value={customMacros.carbs} onChange={e => setCustomMacros({...customMacros, carbs: e.target.value})} className="w-full bg-white dark:bg-slate-800 p-2 rounded-xl text-[10px] font-bold dark:text-white text-center focus:outline-none shadow-sm" />
-               <input type="number" placeholder="Fat" value={customMacros.fat} onChange={e => setCustomMacros({...customMacros, fat: e.target.value})} className="w-full bg-white dark:bg-slate-800 p-2 rounded-xl text-[10px] font-bold dark:text-white text-center focus:outline-none shadow-sm" />
+               {['calories', 'protein', 'carbs', 'fat'].map(k => (
+                 <input key={k} type="number" placeholder={k.substring(0,3)} value={customMacros[k]} onChange={e => setCustomMacros({...customMacros, [k]: e.target.value})} className="w-full bg-white dark:bg-slate-800 p-2 rounded-xl text-[10px] font-bold dark:text-white text-center focus:outline-none shadow-sm" />
+               ))}
              </div>
              <button onClick={() => { if(searchQuery && customMacros.calories) handleAddItem({ name: searchQuery, calories: Number(customMacros.calories), protein: Number(customMacros.protein)||0, carbs: Number(customMacros.carbs)||0, fat: Number(customMacros.fat)||0, portion: '1 custom serving' }); }} className={`w-full py-3 ${th.bg} text-white font-black text-xs uppercase rounded-xl shadow-md active:scale-95 transition-transform`}>Add Custom</button>
           </div>
@@ -300,15 +314,19 @@ const TrackerApp = () => {
 
   return (
     <div className="min-h-screen font-sans flex flex-col items-center bg-slate-900 transition-colors duration-1000">
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.5); border-radius: 10px; }
+      `}</style>
       
-      {/* --- AESTHETIC APP CONTAINER --- */}
       <div 
         className="w-full max-w-md h-screen flex flex-col relative overflow-hidden bg-cover bg-center transition-all duration-1000"
         style={{ backgroundImage: `url(${currentTheme.img})` }}
       >
         <div className={`absolute inset-0 transition-colors duration-1000 ${isDarkMode ? 'bg-black/60' : 'bg-black/20'}`}></div>
 
-        {/* --- GLOBAL HEADER (Now with Macros) --- */}
+        {/* --- GLOBAL HEADER --- */}
         {!isBuilding && (
           <div className="p-6 pb-10 text-white shrink-0 relative z-10">
             <div className="flex justify-between items-center mb-6">
@@ -323,9 +341,7 @@ const TrackerApp = () => {
             <div className="flex items-center gap-6 mb-5">
               <div className="bg-white/15 p-6 rounded-[32px] backdrop-blur-xl border border-white/30 text-center min-w-[120px] shadow-2xl">
                 <div className="text-4xl font-black drop-shadow-md">{safeDailyGoal - totals.calories}</div>
-                <div className="text-[10px] uppercase font-bold tracking-[0.2em] opacity-80 mt-1">
-                  {safeDailyGoal - totals.calories < 0 ? 'Over Goal' : 'Remaining'}
-                </div>
+                <div className="text-[10px] uppercase font-bold tracking-[0.2em] opacity-80 mt-1">Remaining</div>
               </div>
               <div className="flex-1 space-y-2">
                 <div className="flex justify-between items-end drop-shadow-sm"><p className="text-xs font-bold opacity-90 uppercase tracking-widest">Intake: {totals.calories}</p><p className="text-[10px] opacity-80">Goal: {safeDailyGoal}</p></div>
@@ -333,7 +349,6 @@ const TrackerApp = () => {
               </div>
             </div>
 
-            {/* Macro Trackers in Header */}
             <div className="flex justify-between gap-3 px-2">
               {[
                 { label: 'Pro', val: totals.protein, goal: userProfile?.proteinGoal || 150, color: 'bg-rose-400' },
@@ -354,68 +369,47 @@ const TrackerApp = () => {
           </div>
         )}
 
-        {/* --- GLOBAL DATE PICKER MODAL --- */}
+        {/* --- GLOBAL DATE PICKER --- */}
         {isDatePickerOpen && (
           <div className="absolute inset-0 z-[60] bg-slate-950/60 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
             <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl w-full rounded-[40px] shadow-2xl p-6 space-y-4 border border-white/20 dark:border-slate-700/50">
                <div className="flex justify-between items-center px-2">
                   <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest">{pickerMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h3>
                   <div className="flex gap-1">
-                    <button onClick={() => setPickerMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))} className="p-2"><ChevronLeft size={18} className="dark:text-white"/></button>
-                    <button onClick={() => setPickerMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))} className="p-2"><ChevronRight size={18} className="dark:text-white"/></button>
+                    <button onClick={() => setPickerMonth(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth()-1, 1))} className="p-2 dark:text-white"><ChevronLeft/></button>
+                    <button onClick={() => setPickerMonth(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth()+1, 1))} className="p-2 dark:text-white"><ChevronRight/></button>
                   </div>
                </div>
                <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-black text-slate-400">
-                  {['S','M','T','W','T','F','S'].map((d, i) => <div key={`hdr-${i}`}>{d}</div>)}
+                  {['S','M','T','W','T','F','S'].map((d, i) => <div key={i}>{d}</div>)}
                </div>
                <div className="grid grid-cols-7 gap-1.5">
                   {(() => {
-                    const year = pickerMonth.getFullYear(), m = pickerMonth.getMonth();
-                    const days = [], first = new Date(year, m, 1).getDay(), total = new Date(year, m+1, 0).getDate();
+                    const days = [], first = new Date(pickerMonth.getFullYear(), pickerMonth.getMonth(), 1).getDay(), total = new Date(pickerMonth.getFullYear(), pickerMonth.getMonth()+1, 0).getDate();
                     for(let i=0; i<first; i++) days.push(null);
-                    for(let i=1; i<=total; i++) days.push({day: i, date: `${year}-${String(m+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`});
+                    for(let i=1; i<=total; i++) days.push({day: i, date: `${pickerMonth.getFullYear()}-${String(pickerMonth.getMonth()+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`});
                     return days;
                   })().map((d, i) => {
                     if (!d) return <div key={`empty-${i}`}></div>;
-                    
-                    const isToday = d.date === new Date().toISOString().split('T')[0];
                     const isSelected = selectedDate === d.date;
-                    
-                    let btnClasses = 'aspect-square rounded-xl text-xs font-black flex items-center justify-center transition-all active:scale-90 ';
-                    if (isSelected) {
-                        btnClasses += `${th.bg} text-white shadow-lg shadow-black/20 `;
-                    } else {
-                        btnClasses += 'bg-slate-100/50 dark:bg-slate-800/50 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700 ';
-                    }
-                    if (isToday && !isSelected) {
-                        btnClasses += `ring-2 ${th.ring} ring-offset-1 dark:ring-offset-slate-900 `;
-                    }
-
-                    return (
-                      <button key={d.date} onClick={() => { setSelectedDate(d.date); setIsDatePickerOpen(false); }} className={btnClasses}>
-                        {d.day}
-                      </button>
-                    );
+                    return <button key={d.date} onClick={() => { setSelectedDate(d.date); setIsDatePickerOpen(false); }} className={`aspect-square rounded-xl text-xs font-black transition-all ${isSelected ? `${th.bg} text-white` : 'bg-slate-100 dark:bg-slate-800 dark:text-white'}`}>{d.day}</button>;
                   })}
                </div>
-               <div className="flex gap-2 pt-2">
-                  <button onClick={() => { setSelectedDate(new Date().toISOString().split('T')[0]); setIsDatePickerOpen(false); }} className={`flex-1 py-4 ${th.bgLight} ${th.text} rounded-2xl font-black text-xs uppercase tracking-widest transition-colors`}>Today</button>
-                  <button onClick={() => setIsDatePickerOpen(false)} className="flex-1 py-4 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-black text-xs uppercase tracking-widest transition-colors">Cancel</button>
-               </div>
+               <button onClick={() => setIsDatePickerOpen(false)} className="w-full py-4 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-black text-xs uppercase transition-colors">Cancel</button>
             </div>
           </div>
         )}
 
-        {/* --- DYNAMIC TAB CONTENT --- */}
-        <div ref={scrollContainerRef} className={`flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar transition-colors duration-1000 relative z-10 rounded-t-[40px] border-t border-white/40 dark:border-slate-700/50 shadow-[0_-10px_40px_rgba(0,0,0,0.2)] ${isDarkMode ? 'bg-slate-950/85 backdrop-blur-2xl' : 'bg-white/85 backdrop-blur-2xl'}`}>
-          
+        {/* --- DYNAMIC TAB CONTENT (Now Swipeable) --- */}
+        <div 
+          onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+          ref={scrollContainerRef} 
+          className={`flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar transition-colors duration-1000 relative z-10 rounded-t-[40px] border-t border-white/40 dark:border-slate-700/50 shadow-[0_-10px_40px_rgba(0,0,0,0.2)] ${isDarkMode ? 'bg-slate-950/85 backdrop-blur-2xl' : 'bg-white/85 backdrop-blur-2xl'}`}
+        >
           {isBuilding ? (
-            /* BUILDER UI */
             <div className="space-y-6 animate-in slide-in-from-bottom-4 pb-10">
               <div className="flex justify-between items-center"><h2 className="text-2xl font-black dark:text-white">Routine Builder</h2><button onClick={() => setIsBuilding(false)} className="p-2 bg-slate-200/50 dark:bg-slate-800/50 rounded-full text-slate-500 hover:text-rose-500 transition-colors"><X size={20}/></button></div>
-              
               <input placeholder="Name Your Routine..." className="w-full p-5 rounded-3xl bg-white/60 dark:bg-slate-900/60 dark:text-white font-black text-lg border border-white/20 dark:border-slate-700/50 focus:outline-none" value={builderName} onChange={e => setBuilderName(e.target.value)} />
-              
               <div className="space-y-3">
                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-2">Repeat Weekly On</p>
                 <div className="flex justify-between gap-1 bg-white/50 dark:bg-slate-900/50 p-1.5 rounded-[24px] border border-white/20 dark:border-slate-700/50">
@@ -424,14 +418,8 @@ const TrackerApp = () => {
                   ))}
                 </div>
               </div>
-
-              <div className="pt-2 border-t border-slate-200/50 dark:border-slate-700/50">
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-2 mb-3">Add Foods to Routine</p>
-                {renderSearchEngineUI()}
-              </div>
-
+              {renderSearchEngineUI()}
               <div className="space-y-2">
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">{(builderItems || []).length} Planned Items</p>
                 {(builderItems || []).map(item => (
                   <div key={item.id} className="flex justify-between items-center p-4 bg-white/60 dark:bg-slate-900/60 rounded-3xl border border-white/20 dark:border-slate-700/50">
                     <div><p className="text-sm font-bold dark:text-white">{item.name}</p><p className={`text-[10px] ${th.text} font-bold uppercase tracking-widest`}>{item.mealType} • {item.calories} kcal</p></div>
@@ -439,295 +427,151 @@ const TrackerApp = () => {
                   </div>
                 ))}
               </div>
-              <button onClick={saveRoutine} className={`w-full py-5 ${th.bg} text-white rounded-3xl font-black text-lg shadow-xl ${th.shadow} flex items-center justify-center gap-3 transition-transform active:scale-95`}><Save /> Save Routine</button>
+              <button onClick={saveRoutine} className={`w-full py-5 ${th.bg} text-white rounded-3xl font-black text-lg shadow-xl flex items-center justify-center gap-3 transition-transform active:scale-95`}><Save /> Save Routine</button>
             </div>
-            
           ) : activeTab === 'log' ? (
-            /* DAILY LOG TAB */
             <div className="space-y-6 animate-in fade-in pb-6">
-              
-              {/* Rewards Banner Engine */}
               {(isGoalCrushed || isProteinCrushed) && (
-                <div className={`p-4 rounded-[24px] border ${isGoalCrushed && isProteinCrushed ? 'bg-indigo-100 border-indigo-300 dark:bg-indigo-900/30' : isGoalCrushed ? 'bg-amber-100 border-amber-300 dark:bg-amber-900/30' : 'bg-emerald-100 border-emerald-300 dark:bg-emerald-900/30'} flex items-center gap-4 shadow-sm animate-in slide-in-from-top-4`}>
+                <div className={`p-4 rounded-[24px] border ${isGoalCrushed && isProteinCrushed ? 'bg-indigo-100 border-indigo-300 dark:bg-indigo-900/30' : isGoalCrushed ? 'bg-amber-100 border-amber-300 dark:bg-amber-900/30' : 'bg-emerald-100 border-emerald-300 dark:bg-emerald-900/30'} flex items-center gap-4 animate-in slide-in-from-top-4`}>
                   <div className={`p-3 rounded-2xl ${isGoalCrushed && isProteinCrushed ? 'bg-indigo-500 shadow-indigo-500/30' : isGoalCrushed ? 'bg-amber-500 shadow-amber-500/30' : 'bg-emerald-500 shadow-emerald-500/30'} text-white shadow-lg`}>
                     {isGoalCrushed && isProteinCrushed ? <Flame size={20}/> : isGoalCrushed ? <Trophy size={20}/> : <Medal size={20}/>}
                   </div>
                   <div>
                     <p className={`text-[10px] font-black uppercase tracking-widest opacity-70 ${isGoalCrushed && isProteinCrushed ? 'text-indigo-800 dark:text-indigo-400' : isGoalCrushed ? 'text-amber-800 dark:text-amber-400' : 'text-emerald-800 dark:text-emerald-400'}`}>Accomplishment unlocked</p>
-                    <h4 className={`text-sm font-black ${isGoalCrushed && isProteinCrushed ? 'text-indigo-600 dark:text-indigo-500' : isGoalCrushed ? 'text-amber-600 dark:text-amber-500' : 'text-emerald-600 dark:text-emerald-500'}`}>
-                      {isGoalCrushed && isProteinCrushed ? 'Perfect Day: Calories & Protein!' : isGoalCrushed ? 'Calorie Goal Met!' : 'Protein Target Hit!'}
-                    </h4>
+                    <h4 className={`text-sm font-black ${isGoalCrushed && isProteinCrushed ? 'text-indigo-600 dark:text-indigo-500' : isGoalCrushed ? 'text-amber-600 dark:text-amber-500' : 'text-emerald-600 dark:text-emerald-500'}`}>{isGoalCrushed && isProteinCrushed ? 'Perfect Day!' : isGoalCrushed ? 'Calorie Goal Met!' : 'Protein Target Hit!'}</h4>
                   </div>
                 </div>
               )}
-
-              {/* UNIFIED SEARCH MOUNTED IN LOG */}
               {renderSearchEngineUI()}
-
-              {/* Scheduler Suggestion */}
-              {todayRoutines.length > 0 && (dailyLog || []).filter(i => i.date === selectedDate).length === 0 && (
-                <div className={`${th.bgLight} p-5 rounded-[32px] border ${th.border} flex items-center justify-between group shadow-sm`}>
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-white dark:bg-slate-800 rounded-2xl shadow-sm"><Sparkle size={18} className={`${th.text} animate-pulse`} /></div>
-                    <div><p className={`text-[10px] font-black ${th.text} uppercase tracking-widest opacity-80`}>Scheduled Today</p><h4 className="text-sm font-bold dark:text-white">{todayRoutines[0]?.name}</h4></div>
-                  </div>
-                  <button onClick={() => handleApplyRoutine(todayRoutines[0])} className={`px-5 py-2 ${th.bg} text-white rounded-xl font-bold text-xs shadow-md active:scale-95 transition-transform`}>Apply All</button>
-                </div>
-              )}
-
-              {/* Meal Sections */}
               {['Breakfast', 'Lunch', 'Dinner', 'Snacks'].map(m => {
                 const mealItems = (dailyLog || []).filter(i => i.date === selectedDate && i.mealType === m);
-                const mealCals = mealItems.reduce((s, i) => s + (Number(i.calories) || 0), 0);
-                
                 return (
-                  <div key={m} className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md p-5 rounded-[32px] border border-white/50 dark:border-slate-700/50 shadow-sm space-y-4">
-                    <div className="flex justify-between items-center border-b border-white/30 dark:border-slate-700/50 pb-3">
-                      <h3 className="text-sm font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest flex items-center gap-2">
-                        <div className={`w-2.5 h-2.5 rounded-full ${th.bg} shadow-md`}></div>{m}
-                      </h3>
-                      <span className="text-[11px] font-black text-slate-500 bg-white/50 dark:bg-slate-800/50 px-3 py-1 rounded-xl shadow-inner">{mealCals} kcal</span>
+                  <div key={m} className="space-y-4">
+                    <div className="flex justify-between items-center border-b border-white/30 dark:border-slate-700/50 pb-2 mx-1">
+                      <h3 className="text-xs font-black text-slate-500 uppercase flex items-center gap-2 tracking-widest"><div className={`w-2.5 h-2.5 rounded-full ${th.bg}`}></div>{m}</h3>
+                      <span className="text-[10px] font-black text-slate-400">{mealItems.reduce((s,i)=>s+(Number(i.calories)||0),0)} kcal</span>
                     </div>
-                    
                     <div className="space-y-2">
                       {mealItems.map(item => (
-                        <div key={item.id} className="bg-white/70 dark:bg-slate-800/70 p-4 rounded-[24px] flex justify-between items-center shadow-sm border border-white/50 dark:border-slate-700/50 transition-all hover:scale-[1.02]">
+                        <div key={item.id} className="bg-white/70 dark:bg-slate-900/60 p-4 rounded-[28px] flex justify-between items-center shadow-sm border border-white/50 dark:border-slate-700/50 transition-all active:scale-[0.98]">
                           <div className="flex items-center gap-4">
                             <button onClick={() => updateDB('dailyLog', item.id, { ...item, isEaten: !item.isEaten })} className="transition-transform active:scale-75">
                               {item.isEaten !== false ? <CheckCircle2 className={th.text} size={24} /> : <Circle className="text-slate-300 dark:text-slate-600" size={24} />}
                             </button>
                             <div className={item.isEaten === false ? 'opacity-40 line-through' : ''}>
-                              <p className="text-sm font-bold dark:text-white">{item.name}</p>
+                              <p className="text-sm font-bold dark:text-white leading-tight">{item.name}</p>
                               <p className="text-[10px] text-slate-500 font-bold uppercase">{item.calories} kcal</p>
                             </div>
                           </div>
                           <button onClick={() => updateDB('dailyLog', item.id, null, true)} className="p-2 text-slate-300 hover:text-rose-400 transition-colors"><Trash2 size={18}/></button>
                         </div>
                       ))}
-                      
-                      {mealItems.length === 0 ? (
-                        <button onClick={() => { 
-                          setMealType(m); 
-                          if (scrollContainerRef.current) scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-                          setTimeout(() => searchInputRef.current?.focus(), 300);
-                        }} className={`w-full py-4 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-2xl text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 hover:${th.bgLight} hover:${th.text} hover:border-transparent transition-all flex items-center justify-center gap-2`}>
-                          <Plus size={14}/> Add {m}
-                        </button>
-                      ) : (
-                        <button onClick={() => { 
-                          setMealType(m); 
-                          if (scrollContainerRef.current) scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-                          setTimeout(() => searchInputRef.current?.focus(), 300);
-                        }} className={`w-full py-2 border-2 border-dashed border-slate-200 dark:border-slate-700/50 rounded-xl text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 hover:${th.bgLight} hover:${th.text} hover:border-transparent transition-all flex items-center justify-center gap-2 opacity-70`}>
-                          <Plus size={12}/> Add Another
-                        </button>
-                      )}
+                      <button onClick={() => { setMealType(m); searchInputRef.current?.focus(); }} className={`w-full py-4 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-3xl text-[10px] font-black uppercase text-slate-400 hover:${th.bgLight} transition-all flex items-center justify-center gap-2`}>
+                        <Plus size={14}/> Add to {m}
+                      </button>
                     </div>
                   </div>
                 );
               })}
             </div>
-            
           ) : activeTab === 'routines' ? (
-            /* ROUTINES TAB */
             <div className="space-y-4 animate-in fade-in pb-6">
-              <button onClick={() => { setIsBuilding(true); setEditingRoutineId(null); setBuilderName(''); setBuilderItems([]); setSearchQuery(''); setSearchResults([]); setCustomCalories(''); }} className={`w-full py-5 border-2 border-dashed ${th.border} ${th.text} rounded-[32px] font-black tracking-wide text-sm flex items-center justify-center gap-3 hover:${th.bgLight} transition-colors`}>
+              <button onClick={() => { setIsBuilding(true); setEditingRoutineId(null); setBuilderName(''); setBuilderItems([]); setSearchQuery(''); setSearchResults([]); setCustomMacros({calories:'',protein:'',carbs:'',fat:''}); }} className={`w-full py-5 border-2 border-dashed ${th.border} ${th.text} rounded-[32px] font-black tracking-wide text-sm flex items-center justify-center gap-3 hover:${th.bgLight} transition-colors`}>
                 <div className="p-1 bg-white dark:bg-slate-800 rounded-lg shadow-sm"><Plus size={18}/></div> Create New Routine
               </button>
-              
-              {(routines || []).length === 0 && (
-                <div className="text-center py-12 px-6 border border-white/20 dark:border-slate-800/50 rounded-[40px] bg-white/30 dark:bg-slate-900/30">
-                  <p className="text-slate-500 text-sm font-bold">No routines yet.</p>
-                  <p className="text-slate-400 text-xs mt-2">Create one to quickly log repeated meals!</p>
-                </div>
-              )}
-
               {(routines || []).map(r => {
-                if (!r) return null;
                 const isApplied = (dailyLog || []).some(log => log.date === selectedDate && log.routineId === r.id);
                 return (
                   <div key={r.id} className="p-6 bg-white/60 dark:bg-slate-900/60 rounded-[40px] border border-white/40 dark:border-slate-700/50 shadow-sm space-y-4">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="font-black text-lg dark:text-white leading-tight">{r.name || 'Untitled Routine'}</h4>
-                        <div className="flex gap-1.5 mt-2">
-                          {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => <span key={d} className={`text-[8px] font-black uppercase ${r.days?.includes(d) ? th.text : 'text-slate-400 dark:text-slate-600'}`}>{d}</span>)}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4 py-2 border-y border-slate-200/50 dark:border-slate-700/50">
-                      <div className="flex-1 text-center border-r border-slate-200/50 dark:border-slate-700/50"><p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em]">Energy</p><p className={`text-sm font-black ${th.text}`}>{(r.items || []).reduce((s,i)=>s+Number(i.calories), 0)} kcal</p></div>
-                      <div className="flex-1 text-center"><p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em]">Total Items</p><p className="text-sm font-black dark:text-white">{(r.items || []).length}</p></div>
-                    </div>
+                    <h4 className="font-black text-lg dark:text-white">{r.name || 'Untitled'}</h4>
                     <div className="flex gap-2">
-                      {isApplied ? (
-                        <button onClick={() => handleRemoveRoutine(r.id)} className="flex-1 py-3 bg-rose-50 text-rose-600 dark:bg-rose-900/30 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-transform"><X size={16}/> Remove</button>
-                      ) : (
-                        <button onClick={() => handleApplyRoutine(r)} className={`flex-1 py-3 ${th.bgLight} ${th.text} rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-transform`}><CheckCircle2 size={16}/> Apply</button>
-                      )}
-                      <button onClick={() => { setEditingRoutineId(r.id); setBuilderName(r.name || ''); setBuilderItems(r.items || []); setBuilderDays(r.days || []); setSearchQuery(''); setSearchResults([]); setIsBuilding(true); }} className="p-3 bg-white dark:bg-slate-800 rounded-2xl text-slate-400 hover:text-indigo-600 transition-colors shadow-sm"><Pencil size={18}/></button>
+                      <button onClick={() => isApplied ? handleRemoveRoutine(r.id) : handleApplyRoutine(r)} className={`flex-1 py-3 ${isApplied ? 'bg-rose-50 text-rose-600' : th.bgLight + ' ' + th.text} rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-2`}>
+                        {isApplied ? <X size={16}/> : <CheckCircle2 size={16}/>} {isApplied ? 'Remove' : 'Apply'}
+                      </button>
                       <button onClick={() => updateDB('routines', r.id, null, true)} className="p-3 bg-white dark:bg-slate-800 rounded-2xl text-slate-400 hover:text-rose-500 transition-colors shadow-sm"><Trash2 size={18}/></button>
                     </div>
                   </div>
                 );
               })}
             </div>
-            
           ) : activeTab === 'plan' ? (
-            /* HISTORY TAB */
             <div className="space-y-6 animate-in fade-in pb-6">
               <div className="flex items-center gap-3"><CalendarDays className={th.text} size={24} /><h3 className="font-black text-xl dark:text-white tracking-tight">Activity Log</h3></div>
-              
               <div className="bg-white/60 dark:bg-slate-900/60 p-5 rounded-[40px] border border-white/40 dark:border-slate-700/50 shadow-sm">
-                <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-200/50 dark:border-slate-700/50">
-                   <h3 className="font-black text-sm uppercase tracking-widest text-slate-600 dark:text-slate-300">{calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h3>
-                   <div className="flex gap-1">
-                     <button onClick={() => setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))} className="p-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm"><ChevronLeft size={14} className="dark:text-white"/></button>
-                     <button onClick={() => setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))} className="p-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm"><ChevronRight size={14} className="dark:text-white"/></button>
-                   </div>
-                </div>
-                <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
-                  {['S','M','T','W','T','F','S'].map((d, i) => <div key={`hdr-cal-${i}`}>{d}</div>)}
-                </div>
+                <h3 className="font-black text-sm uppercase tracking-widest text-slate-600 dark:text-slate-300 mb-4">{calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h3>
                 <div className="grid grid-cols-7 gap-2.5">
                   {(() => {
-                    const year = calendarMonth.getFullYear(), m = calendarMonth.getMonth();
-                    const days = [], first = new Date(year, m, 1).getDay(), total = new Date(year, m+1, 0).getDate();
+                    const days = [], first = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1).getDay(), total = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth()+1, 0).getDate();
                     for(let i=0; i<first; i++) days.push(null);
                     for(let i=1; i<=total; i++) {
-                      const dStr = `${year}-${String(m+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+                      const dStr = `${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth()+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
                       const cal = (dailyLog || []).filter(l => l.date === dStr && l.isEaten !== false).reduce((s,x)=>s+(Number(x.calories)||0),0);
                       days.push({ day: i, date: dStr, total: cal });
                     }
                     return days;
                   })().map((d, i) => {
-                    if (!d) return <div key={`empty-${i}`}></div>;
-                    
-                    const isToday = d.date === new Date().toISOString().split('T')[0];
-                    const isSelected = viewingHistoryDetail === d.date;
+                    if (!d) return <div key={i}></div>;
                     const hasData = d.total > 0;
-                    const isOver = d.total > safeDailyGoal;
-
-                    let baseBg = 'bg-white/50 dark:bg-slate-800/30';
-                    let baseText = 'text-slate-500 dark:text-white';
-                    let border = 'border border-transparent dark:border-slate-700/50';
-
-                    if (hasData) {
-                      if (isOver) {
-                        baseBg = 'bg-rose-100 dark:bg-rose-500/30';
-                        baseText = 'text-rose-600 dark:text-white';
-                        border = 'border border-rose-200 dark:border-rose-400/50';
-                      } else {
-                        baseBg = `${th.bgLight}`;
-                        baseText = `${th.text} dark:text-white`;
-                        border = `border ${th.border}`;
-                      }
-                    }
-
-                    let ringClass = '';
-                    if (isSelected) ringClass = `ring-2 ${th.ring} ring-offset-2 dark:ring-offset-slate-900 z-10`;
-                    else if (isToday) ringClass = 'ring-2 ring-emerald-400 ring-offset-2 dark:ring-offset-slate-900 z-10';
-
-                    return (
-                      <button key={d.date} onClick={() => setViewingHistoryDetail(d.date)} className={`aspect-square rounded-2xl flex flex-col items-center justify-center transition-all active:scale-90 shadow-sm ${baseBg} ${baseText} ${border} ${ringClass}`}>
-                        <span className="text-[12px] font-black">{d.day}</span>
-                      </button>
-                    );
+                    return <button key={d.date} onClick={() => setViewingHistoryDetail(d.date)} className={`aspect-square rounded-2xl flex items-center justify-center transition-all ${hasData ? th.bgLight + ' ' + th.text : 'bg-slate-100 dark:bg-slate-800 dark:text-slate-500'}`}><span className="text-[12px] font-black">{d.day}</span></button>;
                   })}
                 </div>
               </div>
-
-              {/* History Detail Overlay */}
-              {viewingHistoryDetail && (
-                <div className={`p-6 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-2 ${th.border} rounded-[40px] animate-in slide-in-from-top-4 shadow-xl`}>
-                   <div className="flex justify-between items-center border-b border-slate-200/50 dark:border-slate-700/50 pb-4 mb-4">
-                     <h4 className="font-black text-xs uppercase tracking-[0.2em] dark:text-white">{new Date(viewingHistoryDetail + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' })}</h4>
-                     <button onClick={() => setViewingHistoryDetail(null)} className="p-2 bg-white dark:bg-slate-800 rounded-full shadow-sm"><X size={16}/></button>
-                   </div>
-                   <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-2">
-                     {(dailyLog || []).filter(l => l.date === viewingHistoryDetail).map(item => (
-                       <div key={item.id} className="flex justify-between items-center p-4 bg-white/90 dark:bg-slate-800/90 rounded-[24px] shadow-sm border border-slate-100 dark:border-slate-700/50">
-                         <span className="text-xs font-bold dark:text-white truncate mr-4">{item.name}</span>
-                         <span className={`text-xs font-black ${th.text} whitespace-nowrap`}>{item.calories} kcal</span>
-                       </div>
-                     ))}
-                     {(dailyLog || []).filter(l => l.date === viewingHistoryDetail).length === 0 && <p className="text-center text-[10px] text-slate-400 font-bold uppercase tracking-widest py-6">No food logged</p>}
-                   </div>
-                </div>
-              )}
             </div>
-            
           ) : (
-            /* SETTINGS TAB */
             <div className="space-y-6 animate-in fade-in pb-6">
-               <div className="flex items-center gap-3"><Settings className={th.text} size={24} /><h3 className="font-black text-xl dark:text-white tracking-tight">App Settings</h3></div>
-
-               {/* Nutrition Profile */}
-               <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm p-6 rounded-[32px] border border-white/40 dark:border-slate-700/50 space-y-6 shadow-sm">
-                  <h4 className="text-xs font-black uppercase text-slate-500 tracking-[0.2em] mb-4 flex items-center gap-2"><Target size={14}/> Nutrition Targets</h4>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] px-1 block text-center">Daily Calorie Goal</label>
-                    <SafeInput type="number" className={`w-full p-4 bg-white dark:bg-slate-800 rounded-2xl dark:text-white font-black text-2xl text-center shadow-sm border border-slate-100 dark:border-slate-700 focus:border-transparent focus:ring-2 ${th.ring}`} value={userProfile?.dailyGoal ?? 2000} onChange={v => handleProfileUpdate('dailyGoal', v)} />
+               <div className="flex items-center gap-3"><Settings className={th.text} size={24} /><h3 className="font-black text-xl dark:text-white tracking-tight">Settings</h3></div>
+               
+               <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm p-6 rounded-[32px] border border-white/40 dark:border-slate-700/50 space-y-6">
+                  <h4 className="text-xs font-black uppercase text-slate-500 flex items-center gap-2"><Target size={14}/> Nutrition Targets</h4>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400 block text-center">Daily Calories</label>
+                    <SafeInput type="number" className="w-full p-4 bg-white dark:bg-slate-800 rounded-2xl dark:text-white font-black text-2xl text-center border border-slate-100 dark:border-slate-700" value={userProfile?.dailyGoal} onChange={v => handleProfileUpdate('dailyGoal', v)} />
                   </div>
-
                   <div className="grid grid-cols-3 gap-3">
                     {[
-                      { l: 'Protein (g)', k: 'proteinGoal', c: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-900/20', def: 150 },
-                      { l: 'Carbs (g)', k: 'carbsGoal', c: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-900/20', def: 250 },
-                      { l: 'Fat (g)', k: 'fatGoal', c: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20', def: 65 }
+                      { l: 'Pro', k: 'proteinGoal', c: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-900/20' },
+                      { l: 'Carb', k: 'carbsGoal', c: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
+                      { l: 'Fat', k: 'fatGoal', c: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20' }
                     ].map(g => (
-                      <div key={g.k} className="space-y-2">
+                      <div key={g.k} className="space-y-1">
                         <label className={`text-[9px] font-black uppercase text-center block ${g.c}`}>{g.l}</label>
-                        <SafeInput type="number" className={`w-full p-3 ${g.bg} rounded-xl dark:text-white font-black text-center shadow-sm border border-white/50 dark:border-transparent focus:outline-none focus:ring-2 focus:ring-slate-300`} value={userProfile?.[g.k] ?? g.def} onChange={v => handleProfileUpdate(g.k, v)} />
+                        <SafeInput type="number" className={`w-full p-3 ${g.bg} rounded-xl dark:text-white font-black text-center border border-white/50`} value={userProfile?.[g.k]} onChange={v => handleProfileUpdate(g.k, v)} />
                       </div>
                     ))}
                   </div>
                </div>
 
-               {/* Personal Metrics */}
-               <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm p-6 rounded-[32px] border border-white/40 dark:border-slate-700/50 space-y-6 shadow-sm">
-                  <div className="flex justify-between items-center mb-4">
-                    <h4 className="text-xs font-black uppercase text-slate-500 tracking-[0.2em] flex items-center gap-2"><Scale size={14}/> Body Metrics</h4>
-                    <button onClick={() => handleProfileUpdate('units', userProfile?.units === 'kg' ? 'lbs' : 'kg', true)} className="text-[9px] font-black uppercase tracking-widest text-indigo-500 flex items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded-lg transition-transform active:scale-95"><RefreshCw size={10}/> Switch Units</button>
-                  </div>
-                  
+               <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm p-6 rounded-[32px] border border-white/40 dark:border-slate-700/50 space-y-6">
+                  <div className="flex justify-between items-center"><h4 className="text-xs font-black uppercase text-slate-500 flex items-center gap-2"><Scale size={14}/> Body Metrics</h4><button onClick={() => handleProfileUpdate('units', userProfile?.units === 'kg' ? 'lbs' : 'kg', true)} className="text-[9px] font-black text-indigo-500 px-2 py-1 bg-indigo-50 rounded-lg">{userProfile?.units || 'lbs'}</button></div>
                   <div className="grid grid-cols-2 gap-3">
-                     <div className="space-y-2">
-                        <label className="text-[9px] font-black uppercase text-center block text-slate-400 tracking-widest">Current ({userProfile?.units || 'lbs'})</label>
-                        <SafeInput type="number" className="w-full p-3 bg-white dark:bg-slate-800 rounded-xl dark:text-white font-black text-center shadow-sm border border-slate-100 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300" value={userProfile?.currentWeight ?? 150} onChange={v => handleProfileUpdate('currentWeight', v)} />
-                     </div>
-                     <div className="space-y-2">
-                        <label className={`text-[9px] font-black uppercase text-center block ${th.text} tracking-widest`}>Goal ({userProfile?.units || 'lbs'})</label>
-                        <SafeInput type="number" className={`w-full p-3 ${th.bgLight} rounded-xl dark:text-white font-black text-center shadow-sm border border-white/50 dark:border-transparent focus:outline-none focus:ring-2 ${th.ring}`} value={userProfile?.targetWeight ?? 140} onChange={v => handleProfileUpdate('targetWeight', v)} />
-                     </div>
+                     <div className="space-y-1"><label className="text-[9px] font-black uppercase text-slate-400 block text-center">Current</label><SafeInput type="number" className="w-full p-3 bg-white dark:bg-slate-800 rounded-xl dark:text-white font-black text-center" value={userProfile?.currentWeight} onChange={v => handleProfileUpdate('currentWeight', v)} /></div>
+                     <div className="space-y-1"><label className={`text-[9px] font-black uppercase ${th.text} block text-center`}>Goal</label><SafeInput type="number" className={`w-full p-3 ${th.bgLight} rounded-xl dark:text-white font-black text-center`} value={userProfile?.targetWeight} onChange={v => handleProfileUpdate('targetWeight', v)} /></div>
                   </div>
-                  
-                  <div className="pt-2 border-t border-white/40 dark:border-slate-700/50 mt-4">
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-2 flex items-center gap-2 justify-center"><Droplets size={12} className="text-blue-500"/> Daily Water Goal (oz)</label>
-                    <SafeInput type="number" className="w-full p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl dark:text-white font-black text-xl text-center shadow-sm border border-blue-100 dark:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-300" value={userProfile?.waterGoal ?? 80} onChange={v => handleProfileUpdate('waterGoal', v)} />
+                  <div className="pt-4 border-t border-white/30 dark:border-slate-700/50">
+                    <label className="text-[10px] font-black uppercase text-slate-400 mb-2 flex items-center gap-2 justify-center"><Droplets size={12} className="text-blue-500"/> Daily Water (oz)</label>
+                    <SafeInput type="number" className="w-full p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl dark:text-white font-black text-xl text-center" value={userProfile?.waterGoal} onChange={v => handleProfileUpdate('waterGoal', v)} />
                   </div>
                </div>
 
-               {/* Preferences */}
-               <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm p-6 rounded-[32px] border border-white/40 dark:border-slate-700/50 space-y-4 shadow-sm">
-                  <h4 className="text-xs font-black uppercase text-slate-500 tracking-[0.2em] mb-4 flex items-center gap-2"><Settings size={14}/> Preferences</h4>
-                  
-                  <button onClick={toggleTheme} className="w-full py-4 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center gap-3 font-bold text-slate-600 dark:text-slate-300 transition-transform active:scale-95 shadow-sm border border-slate-100 dark:border-slate-700">
-                    {isDarkMode ? <Sun size={18} className="text-amber-500" /> : <Moon size={18} className={th.text} />}
-                    {isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-                  </button>
-               </div>
+               <button onClick={toggleTheme} className="w-full py-4 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center gap-3 font-bold text-slate-600 dark:text-slate-300 shadow-sm border border-slate-100 dark:border-slate-700">
+                  {isDarkMode ? <Sun size={18} className="text-amber-500" /> : <Moon size={18} className={th.text} />}
+                  {isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+               </button>
             </div>
           )}
         </div>
 
-        {/* --- GLOBAL NAVIGATION (Frosted Pane) --- */}
         {!isBuilding && (
           <div className={`shrink-0 border-t border-white/40 dark:border-slate-700/50 flex justify-around py-5 pb-9 sm:pb-5 transition-all relative z-20 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] ${isDarkMode ? 'bg-slate-950/85 backdrop-blur-2xl' : 'bg-white/85 backdrop-blur-2xl'}`}>
-            <button onClick={() => setActiveTab('log')} className={activeTab === 'log' ? `${th.text} scale-125` : 'text-slate-400 hover:text-slate-500 dark:hover:text-slate-300'}><Clock size={24} strokeWidth={activeTab === 'log' ? 3 : 2}/></button>
-            <button onClick={() => setActiveTab('routines')} className={activeTab === 'routines' ? `${th.text} scale-125` : 'text-slate-400 hover:text-slate-500 dark:hover:text-slate-300'}><ListChecks size={24} strokeWidth={activeTab === 'routines' ? 3 : 2}/></button>
-            <button onClick={() => { setActiveTab('plan'); setViewingHistoryDetail(null); }} className={activeTab === 'plan' ? `${th.text} scale-125` : 'text-slate-400 hover:text-slate-500 dark:hover:text-slate-300'}><CalendarDays size={24} strokeWidth={activeTab === 'plan' ? 3 : 2}/></button>
-            <button onClick={() => setActiveTab('settings')} className={activeTab === 'settings' ? `${th.text} scale-125` : 'text-slate-400 hover:text-slate-500 dark:hover:text-slate-300'}><Settings size={24} strokeWidth={activeTab === 'settings' ? 3 : 2}/></button>
+            {['log', 'routines', 'plan', 'settings'].map((t, idx) => {
+              const Icons = [Clock, ListChecks, CalendarDays, Settings];
+              const Icon = Icons[idx];
+              return (
+                <button key={t} onClick={() => setActiveTab(t)} className={activeTab === t ? `${th.text} scale-125` : 'text-slate-400 hover:text-slate-500 dark:hover:text-slate-300'}>
+                  <Icon size={24} strokeWidth={activeTab === t ? 3 : 2}/>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
